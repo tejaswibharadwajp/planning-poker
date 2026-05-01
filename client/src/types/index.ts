@@ -32,7 +32,7 @@ export interface Room {
 }
 
 export const FIBONACCI_CARDS = [
-  '0', '½', '1', '2', '3', '5', '8', '13', '21', '40', '100', '?', '☕',
+  '0', '½', '1', '2', '3', '5', '8', '13', '21', '40', '100', '☕',
 ];
 
 export const AVATAR_COLORS = [

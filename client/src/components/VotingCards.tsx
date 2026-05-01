@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { FIBONACCI_CARDS } from '../types';
 import clsx from 'clsx';
 
@@ -5,7 +6,6 @@ interface Props {
   selectedVote: string | null;
   onVote: (vote: string) => void;
   disabled?: boolean;
-  hasVoted?: boolean;
 }
 
 const CARD_GRADIENT: Record<string, string> = {
@@ -40,7 +40,20 @@ const CARD_ACCENT: Record<string, string> = {
   '☕':  'text-amber-700 hover:border-amber-600 hover:shadow-amber-100',
 };
 
-export default function VotingCards({ selectedVote, onVote, disabled, hasVoted }: Props) {
+export default function VotingCards({ selectedVote, onVote, disabled }: Props) {
+  const [localVote, setLocalVote] = useState<string | null>(selectedVote);
+
+  // Sync only when server clears/changes vote (story reset, new story)
+  useEffect(() => {
+    setLocalVote(selectedVote);
+  }, [selectedVote]);
+
+  const handleVote = (card: string) => {
+    if (disabled) return;
+    setLocalVote(card);
+    onVote(card);
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">
@@ -49,14 +62,14 @@ export default function VotingCards({ selectedVote, onVote, disabled, hasVoted }
 
       <div className="flex flex-wrap gap-3 justify-center">
         {FIBONACCI_CARDS.map((card) => {
-          const isSelected = selectedVote === card;
+          const isSelected = localVote === card;
           const gradient = CARD_GRADIENT[card] || 'from-indigo-500 to-indigo-700';
           const accent = CARD_ACCENT[card] || 'text-indigo-500 hover:border-indigo-400';
 
           return (
             <button
               key={card}
-              onClick={() => !disabled && onVote(card)}
+              onClick={() => handleVote(card)}
               disabled={disabled}
               className={clsx(
                 'relative w-14 h-[4.75rem] rounded-xl font-extrabold transition-all duration-200 select-none overflow-hidden',
@@ -69,13 +82,6 @@ export default function VotingCards({ selectedVote, onVote, disabled, hasVoted }
                       'scale-[1.15] -translate-y-2.5',
                       'shadow-xl',
                       'ring-2 ring-offset-2 ring-indigo-400',
-                    ]
-                  : hasVoted
-                  ? [
-                      'bg-white border-slate-100 text-slate-400',
-                      'opacity-30 scale-95',
-                      'hover:opacity-55 hover:scale-100 hover:border-slate-300',
-                      'cursor-pointer',
                     ]
                   : [
                       `bg-white border-slate-200 ${accent}`,
@@ -124,11 +130,11 @@ export default function VotingCards({ selectedVote, onVote, disabled, hasVoted }
         })}
       </div>
 
-      {selectedVote ? (
+      {localVote ? (
         <p className="text-center text-sm font-semibold text-indigo-600">
           You picked{' '}
           <span className="inline-block bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-lg font-mono tracking-wide">
-            {selectedVote}
+            {localVote}
           </span>
           {' · '}
           <span className="text-slate-400 font-normal">click another to change</span>
