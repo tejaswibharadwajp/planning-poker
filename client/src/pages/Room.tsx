@@ -386,7 +386,6 @@ export default function Room() {
                       selectedVote={myVote}
                       onVote={(v) => submitVote(activeStory.id, v)}
                       disabled={false}
-                      hasVoted={hasVoted}
                     />
 
                     {/* Reveal button for admin */}
