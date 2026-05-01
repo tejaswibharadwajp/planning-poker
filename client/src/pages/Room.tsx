@@ -11,6 +11,9 @@ import {
   Users,
   BookOpen,
   Zap,
+  Share2,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import StoryPanel from '../components/StoryPanel';
@@ -26,6 +29,9 @@ export default function Room() {
     room,
     userId,
     connected,
+    error,
+    clearError,
+    joinRoom,
     addStory,
     deleteStory,
     selectStory,
@@ -39,15 +45,28 @@ export default function Room() {
   } = useSocket();
 
   const [codeCopied, setCodeCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
 
-  useEffect(() => {
-    if (!room && !sessionStorage.getItem('poker_session')) {
-      navigate('/');
-    }
-  }, [room, navigate]);
+  // Direct URL join state
+  const [joinName, setJoinName] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
 
-  if (!room) {
+  // Capture at mount — true only if prior confirmed session (has userId)
+  const [hasValidSession] = useState(() => {
+    try {
+      const s = sessionStorage.getItem('poker_session');
+      return s ? !!JSON.parse(s)?.userId : false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (room || error) setJoinLoading(false);
+  }, [room, error]);
+
+  if (!room && hasValidSession) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
@@ -57,6 +76,84 @@ export default function Room() {
       </div>
     );
   }
+
+  if (!room && !hasValidSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 flex items-center justify-center px-4">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 bg-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/30">
+              <span className="text-white font-bold text-2xl">♠</span>
+            </div>
+            <h1 className="text-white font-bold text-2xl mb-1">Join Room</h1>
+            <p className="text-slate-400 text-sm">
+              You've been invited to room{' '}
+              <span className="font-mono font-bold text-indigo-300 tracking-widest">{code}</span>
+            </p>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-2xl shadow-black/30 p-7">
+            {error && (
+              <div className="flex items-center gap-2.5 text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!joinName.trim() || !code) return;
+                setJoinLoading(true);
+                clearError();
+                joinRoom({ userName: joinName.trim(), roomCode: code });
+              }}
+              className="space-y-5"
+            >
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Your name
+                </label>
+                <input
+                  type="text"
+                  value={joinName}
+                  onChange={(e) => setJoinName(e.target.value)}
+                  placeholder="e.g. Alex Chen"
+                  maxLength={32}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder-slate-400 text-sm"
+                  required
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={joinLoading || !joinName.trim()}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-lg shadow-indigo-500/25"
+              >
+                {joinLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Users className="w-4 h-4" />
+                )}
+                {joinLoading ? 'Joining…' : 'Join Room'}
+              </button>
+            </form>
+          </div>
+
+          <p className="text-center text-slate-600 text-xs mt-5">
+            Wrong room?{' '}
+            <button
+              onClick={() => navigate('/')}
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Go home
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!room) return null;
 
   const currentUser = room.users.find((u) => u.id === userId) ?? null;
   const isAdmin = currentUser?.isAdmin ?? false;
@@ -74,6 +171,12 @@ export default function Room() {
     await navigator.clipboard.writeText(room.code);
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(window.location.href);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const handleLeave = () => {
@@ -109,6 +212,25 @@ export default function Room() {
             <Check className="w-3.5 h-3.5 text-emerald-400" />
           ) : (
             <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+          )}
+        </button>
+
+        {/* Share link */}
+        <button
+          onClick={copyLink}
+          title="Copy invite link"
+          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
+        >
+          {linkCopied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-emerald-400 hidden sm:block">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+              <span className="text-slate-400 group-hover:text-white transition-colors hidden sm:block">Share</span>
+            </>
           )}
         </button>
 
@@ -264,6 +386,7 @@ export default function Room() {
                       selectedVote={myVote}
                       onVote={(v) => submitVote(activeStory.id, v)}
                       disabled={false}
+                      hasVoted={hasVoted}
                     />
 
                     {/* Reveal button for admin */}
