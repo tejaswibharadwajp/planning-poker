@@ -10,6 +10,7 @@ export default function Home() {
   const [userName, setUserName] = useState('');
   const [roomName, setRoomName] = useState('');
   const [roomCode, setRoomCode] = useState('');
+  const [isSpectator, setIsSpectator] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function Home() {
     if (!userName.trim() || !roomCode.trim()) return;
     setLoading(true);
     clearError();
-    joinRoom({ userName: userName.trim(), roomCode: roomCode.trim().toUpperCase() });
+    joinRoom({ userName: userName.trim(), roomCode: roomCode.trim().toUpperCase(), isSpectator });
   };
 
   const features = [
@@ -205,6 +206,23 @@ export default function Home() {
                         required
                       />
                     </div>
+                    <label className="flex items-center gap-3 cursor-pointer select-none group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={isSpectator}
+                          onChange={(e) => setIsSpectator(e.target.checked)}
+                          className="sr-only"
+                        />
+                        <div className={`w-10 h-6 rounded-full transition-colors ${isSpectator ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isSpectator ? 'translate-x-4' : ''}`} />
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold text-slate-700">Join as spectator</span>
+                        <p className="text-xs text-slate-400">Watch without voting — for PMs, stakeholders</p>
+                      </div>
+                    </label>
+
                     <button
                       type="submit"
                       disabled={loading || !userName.trim() || !roomCode.trim()}

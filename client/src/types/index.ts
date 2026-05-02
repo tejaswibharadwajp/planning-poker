@@ -2,9 +2,19 @@ export interface User {
   id: string;
   name: string;
   isAdmin: boolean;
+  isSpectator: boolean;
+  isMuted: boolean;
   vote: string | null;
   hasVoted: boolean;
   isConnected: boolean;
+}
+
+export interface Reaction {
+  id: string;
+  emoji: string;
+  userName: string;
+  userId: string;
+  x: number;
 }
 
 export interface StoryVote {

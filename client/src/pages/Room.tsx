@@ -14,6 +14,7 @@ import {
   Share2,
   Loader2,
   AlertCircle,
+  VolumeX,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import StoryPanel from '../components/StoryPanel';
@@ -21,6 +22,8 @@ import VotingCards from '../components/VotingCards';
 import ParticipantsPanel from '../components/ParticipantsPanel';
 import VoteResults from '../components/VoteResults';
 import clsx from 'clsx';
+
+const REACTION_EMOJIS = ['👍', '🔥', '😬', '🤔', '🎉'];
 
 export default function Room() {
   const navigate = useNavigate();
@@ -30,6 +33,8 @@ export default function Room() {
     userId,
     connected,
     error,
+    kicked,
+    reactions,
     clearError,
     joinRoom,
     addStory,
@@ -40,6 +45,9 @@ export default function Room() {
     resetVotes,
     setEstimate,
     promoteUser,
+    kickUser,
+    toggleMute,
+    sendReaction,
     leaveRoom,
     startQuickVote,
   } = useSocket();
@@ -61,6 +69,11 @@ export default function Room() {
       return false;
     }
   });
+
+  // Redirect when kicked
+  useEffect(() => {
+    if (kicked) navigate('/');
+  }, [kicked, navigate]);
 
   useEffect(() => {
     if (room || error) setJoinLoading(false);
@@ -157,6 +170,8 @@ export default function Room() {
 
   const currentUser = room.users.find((u) => u.id === userId) ?? null;
   const isAdmin = currentUser?.isAdmin ?? false;
+  const isSpectator = currentUser?.isSpectator ?? false;
+  const isMuted = currentUser?.isMuted ?? false;
   const activeStory = room.stories.find((s) => s.id === room.activeStoryId) ?? null;
   const myVote = currentUser?.vote ?? null;
   const hasVoted = currentUser?.hasVoted ?? false;
@@ -164,8 +179,9 @@ export default function Room() {
   const votingPhase = activeStory?.status === 'voting';
   const revealedPhase = activeStory?.status === 'revealed';
   const connectedUsers = room.users.filter((u) => u.isConnected);
-  const votedCount = connectedUsers.filter((u) => u.hasVoted).length;
-  const allVoted = connectedUsers.length > 0 && votedCount === connectedUsers.length;
+  const votingUsers = connectedUsers.filter((u) => !u.isSpectator);
+  const votedCount = votingUsers.filter((u) => u.hasVoted).length;
+  const allVoted = votingUsers.length > 0 && votedCount === votingUsers.length;
 
   const copyCode = async () => {
     await navigator.clipboard.writeText(room.code);
@@ -186,8 +202,21 @@ export default function Room() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+      {/* ── Floating reactions overlay ── */}
+      <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
+        {reactions.map((r) => (
+          <div
+            key={r.id}
+            className="absolute bottom-20 reaction-float text-3xl select-none"
+            style={{ left: `${r.x}%` }}
+          >
+            {r.emoji}
+          </div>
+        ))}
+      </div>
+
       {/* ── Header ── */}
-      <header className="h-14 bg-slate-900 flex items-center px-4 gap-4 flex-shrink-0 border-b border-slate-800">
+      <header className="h-14 bg-slate-900 flex items-center px-3 gap-2 sm:gap-4 sm:px-4 flex-shrink-0 border-b border-slate-800">
         {/* Brand */}
         <div className="flex items-center gap-2.5 mr-2">
           <div className="w-7 h-7 bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/30 flex-shrink-0">
@@ -206,7 +235,7 @@ export default function Room() {
           onClick={copyCode}
           className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors group"
         >
-          <span className="text-slate-400 text-xs">Code:</span>
+          <span className="text-slate-400 text-xs hidden sm:block">Code:</span>
           <span className="text-white font-mono font-bold text-sm tracking-widest">{room.code}</span>
           {codeCopied ? (
             <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -219,29 +248,29 @@ export default function Room() {
         <button
           onClick={copyLink}
           title="Copy invite link"
-          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
+          className="hidden sm:flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
         >
           {linkCopied ? (
             <>
               <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400 hidden sm:block">Copied!</span>
+              <span className="text-emerald-400">Copied!</span>
             </>
           ) : (
             <>
               <Share2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
-              <span className="text-slate-400 group-hover:text-white transition-colors hidden sm:block">Share</span>
+              <span className="text-slate-400 group-hover:text-white transition-colors">Share</span>
             </>
           )}
         </button>
 
         {/* Connection status */}
-        <div className={clsx('flex items-center gap-1.5 text-xs font-medium', connected ? 'text-emerald-400' : 'text-red-400')}>
+        <div className={clsx('hidden sm:flex items-center gap-1.5 text-xs font-medium', connected ? 'text-emerald-400' : 'text-red-400')}>
           {connected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
           <span className="hidden sm:block">{connected ? 'Live' : 'Offline'}</span>
         </div>
 
         {/* Users count */}
-        <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+        <div className="hidden sm:flex items-center gap-1.5 text-slate-400 text-xs">
           <Users className="w-3.5 h-3.5" />
           <span>{connectedUsers.length}</span>
         </div>
@@ -294,6 +323,7 @@ export default function Room() {
             stories={room.stories}
             activeStoryId={room.activeStoryId}
             currentUser={currentUser}
+            roomName={room.name}
             onAdd={addStory}
             onDelete={deleteStory}
             onSelect={selectStory}
@@ -319,6 +349,8 @@ export default function Room() {
                   <p className="text-slate-500 text-sm leading-relaxed mb-5">
                     {isAdmin
                       ? 'Select a story from the backlog, or start a quick vote without one.'
+                      : isSpectator
+                      ? 'Watching as spectator. Waiting for facilitator to start a vote.'
                       : 'Waiting for the facilitator to start a vote.'}
                   </p>
                   {isAdmin && (
@@ -362,7 +394,7 @@ export default function Room() {
                         </span>
                         {votingPhase && (
                           <span className="text-xs text-slate-500">
-                            {votedCount}/{connectedUsers.length} voted
+                            {votedCount}/{votingUsers.length} voted
                             {allVoted && ' · All in!'}
                           </span>
                         )}
@@ -379,40 +411,53 @@ export default function Room() {
                   </div>
                 </div>
 
-                {/* Voting cards (only when voting & not yet revealed) */}
+                {/* Voting cards */}
                 {votingPhase && (
                   <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                    <VotingCards
-                      selectedVote={myVote}
-                      onVote={(v) => submitVote(activeStory.id, v)}
-                      disabled={false}
-                    />
-
-                    {/* Reveal button for admin */}
-                    {isAdmin && (
-                      <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-xs text-slate-400">
-                          {allVoted ? '✓ All participants have voted' : `Waiting for ${connectedUsers.length - votedCount} more…`}
-                        </span>
-                        <button
-                          onClick={() => revealVotes(activeStory.id)}
-                          className={clsx(
-                            'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all',
-                            allVoted
-                              ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 animate-bounce-once'
-                              : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'
-                          )}
-                        >
-                          <Eye className="w-4 h-4" />
-                          Reveal Votes
-                        </button>
+                    {isSpectator ? (
+                      <div className="text-center py-6 text-slate-500 text-sm">
+                        👁 Spectator mode — watching the vote
                       </div>
-                    )}
-
-                    {!isAdmin && hasVoted && (
-                      <div className="mt-4 text-center text-sm text-slate-500">
-                        Waiting for the facilitator to reveal votes…
+                    ) : isMuted ? (
+                      <div className="text-center py-6">
+                        <VolumeX className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                        <p className="text-slate-500 text-sm">You've been muted by the facilitator</p>
                       </div>
+                    ) : (
+                      <>
+                        <VotingCards
+                          selectedVote={myVote}
+                          onVote={(v) => submitVote(activeStory.id, v)}
+                          disabled={false}
+                        />
+
+                        {/* Reveal button for admin */}
+                        {isAdmin && (
+                          <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                            <span className="text-xs text-slate-400">
+                              {allVoted ? '✓ All participants have voted' : `Waiting for ${votingUsers.length - votedCount} more…`}
+                            </span>
+                            <button
+                              onClick={() => revealVotes(activeStory.id)}
+                              className={clsx(
+                                'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all',
+                                allVoted
+                                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 animate-bounce-once'
+                                  : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'
+                              )}
+                            >
+                              <Eye className="w-4 h-4" />
+                              Reveal Votes
+                            </button>
+                          </div>
+                        )}
+
+                        {!isAdmin && hasVoted && (
+                          <div className="mt-4 text-center text-sm text-slate-500">
+                            Waiting for the facilitator to reveal votes…
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -428,6 +473,19 @@ export default function Room() {
                     />
                   </div>
                 )}
+
+                {/* Reaction bar */}
+                <div className="flex items-center justify-center gap-2 pb-2">
+                  {REACTION_EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => sendReaction(emoji)}
+                      className="w-10 h-10 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-xl transition-all hover:scale-110 shadow-sm"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -446,6 +504,8 @@ export default function Room() {
             activeStory={activeStory}
             isAdmin={isAdmin}
             onPromote={promoteUser}
+            onKick={kickUser}
+            onToggleMute={toggleMute}
           />
         </div>
       </div>

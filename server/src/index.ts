@@ -9,6 +9,8 @@ interface User {
   socketId: string;
   name: string;
   isAdmin: boolean;
+  isSpectator: boolean;
+  isMuted: boolean;
   vote: string | null;
   hasVoted: boolean;
   isConnected: boolean;
@@ -64,6 +66,8 @@ function sanitizeRoom(room: Room) {
       id: u.id,
       name: u.name,
       isAdmin: u.isAdmin,
+      isSpectator: u.isSpectator,
+      isMuted: u.isMuted,
       hasVoted: u.hasVoted,
       vote: votesRevealed ? u.vote : u.hasVoted ? '?' : null,
       isConnected: u.isConnected,
@@ -103,10 +107,12 @@ io.on('connection', (socket) => {
       roomName,
       roomCode,
       userName,
+      isSpectator = false,
     }: {
       roomName?: string;
       roomCode?: string;
       userName: string;
+      isSpectator?: boolean;
     }) => {
       let room: Room;
       const userId = uuidv4();
@@ -125,6 +131,8 @@ io.on('connection', (socket) => {
           socketId: socket.id,
           name: userName,
           isAdmin: false,
+          isSpectator: !!isSpectator,
+          isMuted: false,
           vote: null,
           hasVoted: false,
           isConnected: true,
@@ -141,6 +149,8 @@ io.on('connection', (socket) => {
               socketId: socket.id,
               name: userName,
               isAdmin: true,
+              isSpectator: false,
+              isMuted: false,
               vote: null,
               hasVoted: false,
               isConnected: true,
@@ -189,6 +199,8 @@ io.on('connection', (socket) => {
           socketId: socket.id,
           name: userName,
           isAdmin: room.users.filter((u) => u.isConnected).length === 0,
+          isSpectator: false,
+          isMuted: false,
           vote: null,
           hasVoted: false,
           isConnected: true,
@@ -285,7 +297,7 @@ io.on('connection', (socket) => {
       const room = getRoomByCode(socket.data.roomCode);
       if (!room) return;
       const user = room.users.find((u) => u.id === socket.data.userId);
-      if (!user) return;
+      if (!user || user.isSpectator || user.isMuted) return;
       const story = room.stories.find((s) => s.id === storyId);
       if (!story || story.status !== 'voting') return;
 
@@ -353,6 +365,45 @@ io.on('connection', (socket) => {
 
     target.isAdmin = true;
     io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
+  });
+
+  socket.on('kick-user', ({ targetUserId }: { targetUserId: string }) => {
+    const room = getRoomByCode(socket.data.roomCode);
+    if (!room) return;
+    const user = room.users.find((u) => u.id === socket.data.userId);
+    if (!user?.isAdmin) return;
+    const target = room.users.find((u) => u.id === targetUserId);
+    if (!target || target.id === user.id) return;
+
+    io.to(target.socketId).emit('kicked');
+    room.users = room.users.filter((u) => u.id !== targetUserId);
+    io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
+  });
+
+  socket.on('toggle-mute', ({ targetUserId }: { targetUserId: string }) => {
+    const room = getRoomByCode(socket.data.roomCode);
+    if (!room) return;
+    const user = room.users.find((u) => u.id === socket.data.userId);
+    if (!user?.isAdmin) return;
+    const target = room.users.find((u) => u.id === targetUserId);
+    if (!target || target.id === user.id) return;
+
+    target.isMuted = !target.isMuted;
+    io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
+  });
+
+  socket.on('send-reaction', ({ emoji }: { emoji: string }) => {
+    const room = getRoomByCode(socket.data.roomCode);
+    if (!room) return;
+    const user = room.users.find((u) => u.id === socket.data.userId);
+    if (!user) return;
+
+    io.to(room.code).emit('reaction', {
+      id: uuidv4(),
+      emoji,
+      userName: user.name,
+      userId: user.id,
+    });
   });
 
   socket.on('disconnect', () => {
