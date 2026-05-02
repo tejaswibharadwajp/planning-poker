@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Room } from '../types';
+import { Room, Reaction } from '../types';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
@@ -17,11 +17,14 @@ interface SocketContextValue {
   userId: string | null;
   error: string | null;
   connected: boolean;
+  kicked: boolean;
+  reactions: Reaction[];
   startQuickVote: () => void;
   joinRoom: (params: {
     roomName?: string;
     roomCode?: string;
     userName: string;
+    isSpectator?: boolean;
   }) => void;
   addStory: (title: string, description?: string) => void;
   deleteStory: (storyId: string) => void;
@@ -31,6 +34,9 @@ interface SocketContextValue {
   resetVotes: (storyId: string) => void;
   setEstimate: (storyId: string, estimate: string) => void;
   promoteUser: (targetUserId: string) => void;
+  kickUser: (targetUserId: string) => void;
+  toggleMute: (targetUserId: string) => void;
+  sendReaction: (emoji: string) => void;
   leaveRoom: () => void;
   clearError: () => void;
 }
@@ -43,6 +49,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [kicked, setKicked] = useState(false);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
 
   useEffect(() => {
     const socket = io(SOCKET_URL, {
@@ -92,13 +100,28 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     socket.on('error', ({ message }: { message: string }) => setError(message));
 
+    socket.on('kicked', () => {
+      sessionStorage.removeItem('poker_session');
+      setRoom(null);
+      setUserId(null);
+      setKicked(true);
+    });
+
+    socket.on('reaction', (r: Omit<Reaction, 'x'>) => {
+      const reaction: Reaction = { ...r, x: 10 + Math.random() * 80 };
+      setReactions((prev) => [...prev, reaction]);
+      setTimeout(() => {
+        setReactions((prev) => prev.filter((rx) => rx.id !== reaction.id));
+      }, 3000);
+    });
+
     return () => {
       socket.disconnect();
     };
   }, []);
 
   const joinRoom = useCallback(
-    (params: { roomName?: string; roomCode?: string; userName: string }) => {
+    (params: { roomName?: string; roomCode?: string; userName: string; isSpectator?: boolean }) => {
       sessionStorage.setItem(
         'poker_session',
         JSON.stringify({
@@ -172,6 +195,24 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const kickUser = useCallback(
+    (targetUserId: string) =>
+      socketRef.current?.emit('kick-user', { targetUserId }),
+    []
+  );
+
+  const toggleMute = useCallback(
+    (targetUserId: string) =>
+      socketRef.current?.emit('toggle-mute', { targetUserId }),
+    []
+  );
+
+  const sendReaction = useCallback(
+    (emoji: string) =>
+      socketRef.current?.emit('send-reaction', { emoji }),
+    []
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   return (
@@ -181,6 +222,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         userId,
         error,
         connected,
+        kicked,
+        reactions,
         startQuickVote,
         joinRoom,
         addStory,
@@ -191,6 +234,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         resetVotes,
         setEstimate,
         promoteUser,
+        kickUser,
+        toggleMute,
+        sendReaction,
         leaveRoom,
         clearError,
       }}

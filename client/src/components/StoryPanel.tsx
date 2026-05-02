@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Play, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Play, CheckCircle2, Clock, ChevronRight, Download } from 'lucide-react';
 import { Story, User } from '../types';
 import AddStoryModal from './AddStoryModal';
 
@@ -7,7 +7,8 @@ interface Props {
   stories: Story[];
   activeStoryId: string | null;
   currentUser: User | null;
-  onAdd: (title: string, description: string) => void;
+  roomName: string;
+  onAdd: (title: string, description?: string) => void;
   onDelete: (storyId: string) => void;
   onSelect: (storyId: string) => void;
 }
@@ -23,6 +24,7 @@ export default function StoryPanel({
   stories,
   activeStoryId,
   currentUser,
+  roomName,
   onAdd,
   onDelete,
   onSelect,
@@ -31,6 +33,25 @@ export default function StoryPanel({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const isAdmin = currentUser?.isAdmin ?? false;
+
+  const exportCSV = () => {
+    const headers = ['Title', 'Description', 'Status', 'Final Estimate', 'Votes'];
+    const rows = stories.map((s) => [
+      `"${s.title.replace(/"/g, '""')}"`,
+      `"${s.description.replace(/"/g, '""')}"`,
+      s.status,
+      s.finalEstimate ?? '',
+      `"${Object.values(s.votes).map((v) => `${v.userName}: ${v.vote}`).join('; ')}"`,
+    ]);
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${roomName.replace(/[^a-z0-9]/gi, '-')}-estimates.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const pending = stories.filter((s) => s.status === 'pending');
   const active = stories.filter((s) => s.status === 'voting' || s.status === 'revealed');
@@ -104,15 +125,27 @@ export default function StoryPanel({
       <div className="px-4 pt-4 pb-3 border-b border-slate-700">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-white">Backlog</h2>
-          {isAdmin && (
-            <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {done.length > 0 && (
+              <button
+                onClick={exportCSV}
+                title="Export CSV"
+                className="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-emerald-400 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:block">Export</span>
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add
+              </button>
+            )}
+          </div>
         </div>
 
         {totalStories > 0 && (
