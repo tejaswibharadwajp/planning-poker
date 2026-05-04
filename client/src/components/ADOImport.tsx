@@ -77,6 +77,8 @@ export default function ADOImport({ onAdd, onClose }: Props) {
       setIterations(iters);
       const current = iters.find((i) => i.attributes?.timeFrame === 'current');
       setSelectedIterationId(current?.id ?? iters[0]?.id ?? '');
+      // Save ADO config so write-back can use it later
+      sessionStorage.setItem('ado_config', JSON.stringify({ org: normalizeOrg(org), project: project.trim(), pat }));
       setStep('iterations');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Connection failed');

@@ -8,6 +8,7 @@ import {
   ReactNode,
 } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { Room, Reaction } from '../types';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
@@ -51,6 +52,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [kicked, setKicked] = useState(false);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const { getToken, userId: clerkUserId } = useAuth();
+  const { user } = useUser();
 
   useEffect(() => {
     const socket = io(SOCKET_URL, {
@@ -59,6 +62,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
+    // Attach Clerk identity once available
+    if (clerkUserId) {
+      socket.auth = { clerkUserId };
+    }
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -129,9 +136,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
           roomCode: params.roomCode?.toUpperCase() || '',
         })
       );
-      socketRef.current?.emit('join-room', params);
+      socketRef.current?.emit('join-room', {
+        ...params,
+        clerkUserId: clerkUserId ?? undefined,
+        clerkEmail: user?.emailAddresses[0]?.emailAddress ?? undefined,
+      });
     },
-    []
+    [clerkUserId, user]
   );
 
   const startQuickVote = useCallback(

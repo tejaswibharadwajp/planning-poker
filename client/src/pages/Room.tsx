@@ -17,6 +17,8 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
+import { useUser } from '@clerk/clerk-react';
+import { writeBackToADO } from '../utils/adoWriteBack';
 import StoryPanel from '../components/StoryPanel';
 import VotingCards from '../components/VotingCards';
 import ParticipantsPanel from '../components/ParticipantsPanel';
@@ -52,13 +54,24 @@ export default function Room() {
     startQuickVote,
   } = useSocket();
 
+  const { user } = useUser();
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
 
-  // Direct URL join state
-  const [joinName, setJoinName] = useState('');
+  // Direct URL join state — pre-fill from Clerk
+  const [joinName, setJoinName] = useState(
+    () => user?.fullName || user?.firstName || user?.emailAddresses[0]?.emailAddress?.split('@')[0] || ''
+  );
   const [joinLoading, setJoinLoading] = useState(false);
+
+  const handleSetEstimate = (storyId: string, estimate: string) => {
+    setEstimate(storyId, estimate);
+    const story = room?.stories.find((s) => s.id === storyId);
+    if (story) {
+      writeBackToADO(story.title, estimate).catch(() => {/* silent */});
+    }
+  };
 
   // Capture at mount — true only if prior confirmed session (has userId)
   const [hasValidSession] = useState(() => {
@@ -469,7 +482,7 @@ export default function Room() {
                       story={activeStory}
                       isAdmin={isAdmin}
                       onRevote={() => resetVotes(activeStory.id)}
-                      onSetEstimate={(est) => setEstimate(activeStory.id, est)}
+                      onSetEstimate={(est) => handleSetEstimate(activeStory.id, est)}
                     />
                   </div>
                 )}
