@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ArrowRight, Loader2, AlertCircle, Zap, Users, BarChart2, Shield } from 'lucide-react';
+import { Plus, ArrowRight, Loader2, AlertCircle, Zap, Users, BarChart2, Shield, LogOut } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
+import { useUser, useClerk } from '@clerk/clerk-react';
 
 export default function Home() {
   const navigate = useNavigate();
   const { joinRoom, error, room, clearError } = useSocket();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const [tab, setTab] = useState<'create' | 'join'>('create');
   const [userName, setUserName] = useState('');
   const [roomName, setRoomName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [isSpectator, setIsSpectator] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user && !userName) {
+      setUserName(user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress?.split('@')[0] || '');
+    }
+  }, [user]);
 
   useEffect(() => {
     if (room) navigate(`/room/${room.code}`);
@@ -54,8 +63,19 @@ export default function Home() {
           </div>
           <span className="text-white font-bold text-lg tracking-tight">Sprint Planner</span>
         </div>
-        <div className="text-slate-400 text-sm">
-          Planning Poker for agile teams
+        <div className="flex items-center gap-3">
+          {user && (
+            <span className="text-slate-400 text-sm hidden sm:block">
+              {user.firstName || user.emailAddresses[0]?.emailAddress}
+            </span>
+          )}
+          <button
+            onClick={() => signOut()}
+            className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs font-medium transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign out
+          </button>
         </div>
       </nav>
 

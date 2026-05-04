@@ -1,13 +1,22 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  dbCreateRoom,
+  dbCreateStory,
+  dbUpsertVote,
+  dbSetStoryEstimate,
+  dbUpdateStoryStatus,
+} from './db';
 
 interface User {
   id: string;
   socketId: string;
   name: string;
+  clerkUserId?: string;
   isAdmin: boolean;
   isSpectator: boolean;
   isMuted: boolean;
@@ -108,11 +117,13 @@ io.on('connection', (socket) => {
       roomCode,
       userName,
       isSpectator = false,
+      clerkUserId,
     }: {
       roomName?: string;
       roomCode?: string;
       userName: string;
       isSpectator?: boolean;
+      clerkUserId?: string;
     }) => {
       let room: Room;
       const userId = uuidv4();
@@ -130,6 +141,7 @@ io.on('connection', (socket) => {
           id: userId,
           socketId: socket.id,
           name: userName,
+          clerkUserId,
           isAdmin: false,
           isSpectator: !!isSpectator,
           isMuted: false,
@@ -139,8 +151,9 @@ io.on('connection', (socket) => {
         });
       } else {
         const code = generateRoomCode();
+        const roomId = uuidv4();
         room = {
-          id: uuidv4(),
+          id: roomId,
           name: roomName?.trim() || `${userName}'s Room`,
           code,
           users: [
@@ -148,6 +161,7 @@ io.on('connection', (socket) => {
               id: userId,
               socketId: socket.id,
               name: userName,
+              clerkUserId,
               isAdmin: true,
               isSpectator: false,
               isMuted: false,
@@ -161,6 +175,13 @@ io.on('connection', (socket) => {
           createdAt: Date.now(),
         };
         rooms.set(room.id, room);
+        // Persist room to DB (fire-and-forget)
+        dbCreateRoom({
+          id: roomId,
+          code,
+          name: room.name,
+          adminId: clerkUserId || userId,
+        }).catch(console.error);
       }
 
       socket.join(room.code);
@@ -252,14 +273,18 @@ io.on('connection', (socket) => {
       const user = room.users.find((u) => u.id === socket.data.userId);
       if (!user?.isAdmin) return;
 
+      const storyId = uuidv4();
+      const storyTitle = title.trim();
+      const storyDesc = description?.trim() || '';
       room.stories.push({
-        id: uuidv4(),
-        title: title.trim(),
-        description: description?.trim() || '',
+        id: storyId,
+        title: storyTitle,
+        description: storyDesc,
         votes: {},
         finalEstimate: null,
         status: 'pending',
       });
+      dbCreateStory({ id: storyId, roomId: room.id, title: storyTitle, description: storyDesc }).catch(console.error);
       io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
     }
   );
@@ -304,6 +329,7 @@ io.on('connection', (socket) => {
       user.vote = vote;
       user.hasVoted = true;
       story.votes[user.id] = { vote, userName: user.name };
+      dbUpsertVote({ storyId, userId: user.id, userName: user.name, vote }).catch(console.error);
 
       io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
     }
@@ -318,6 +344,7 @@ io.on('connection', (socket) => {
     if (!story) return;
 
     story.status = 'revealed';
+    dbUpdateStoryStatus(storyId, 'revealed').catch(console.error);
     io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
   });
 
@@ -351,6 +378,7 @@ io.on('connection', (socket) => {
       story.finalEstimate = estimate;
       story.status = 'done';
       room.activeStoryId = null;
+      dbSetStoryEstimate(storyId, estimate).catch(console.error);
       io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
     }
   );

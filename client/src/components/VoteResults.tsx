@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RotateCcw, CheckCircle, TrendingUp, Sparkles } from 'lucide-react';
+import { RotateCcw, CheckCircle, TrendingUp, TrendingDown, Sparkles, MessageCircle } from 'lucide-react';
 import { Story, FIBONACCI_CARDS } from '../types';
 import clsx from 'clsx';
 
@@ -10,7 +10,18 @@ interface Props {
   onSetEstimate: (estimate: string) => void;
 }
 
-const NUMERIC_CARDS = FIBONACCI_CARDS.filter((c) => !isNaN(parseFloat(c)) && c !== '?');
+const NUMERIC_CARDS = FIBONACCI_CARDS.filter((c) => !isNaN(parseFloat(c)));
+const NUMERIC_VALUES = NUMERIC_CARDS.map((c) => (c === '½' ? 0.5 : parseFloat(c)));
+
+function fibIndex(v: number): number {
+  let closest = 0;
+  let minDist = Infinity;
+  NUMERIC_VALUES.forEach((fv, i) => {
+    const d = Math.abs(fv - v);
+    if (d < minDist) { minDist = d; closest = i; }
+  });
+  return closest;
+}
 
 function parseVote(v: string): number | null {
   if (v === '½') return 0.5;
@@ -49,6 +60,25 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate }:
 
   const maxCount = Math.max(...Object.values(distribution).map((v) => v.length), 1);
   const isConsensus = Object.keys(distribution).length === 1 && votes.length > 0;
+
+  // Divergence detection
+  const minIdx = minVote !== null ? fibIndex(minVote) : 0;
+  const maxIdx = maxVote !== null ? fibIndex(maxVote) : 0;
+  const spread = maxIdx - minIdx;
+  const hasDivergence = !isConsensus && numericVotes.length >= 2 && spread >= 2;
+
+  const skeptics = hasDivergence
+    ? votes.filter((v) => {
+        const n = parseVote(v.vote);
+        return n !== null && fibIndex(n) <= minIdx + 1;
+      })
+    : [];
+  const optimists = hasDivergence
+    ? votes.filter((v) => {
+        const n = parseVote(v.vote);
+        return n !== null && fibIndex(n) >= maxIdx - 1;
+      })
+    : [];
 
   // Suggested estimate: nearest Fibonacci to average
   const suggested =
@@ -91,6 +121,56 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate }:
         </div>
       )}
 
+      {/* Divergence panel */}
+      {hasDivergence && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-200 bg-amber-100/60">
+            <MessageCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <p className="text-sm font-semibold text-amber-800">Wide range detected — discussion needed</p>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-amber-200">
+            {/* Skeptics */}
+            <div className="p-4 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <TrendingDown className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Voted Low</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {skeptics.map(({ userName, vote }) => (
+                  <span
+                    key={userName}
+                    className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-lg"
+                  >
+                    {userName.split(' ')[0]}
+                    <span className="bg-blue-200 px-1 rounded font-mono">{vote}</span>
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-blue-600 italic">Ask: why did you vote low?</p>
+            </div>
+            {/* Optimists */}
+            <div className="p-4 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+                <span className="text-xs font-bold text-rose-700 uppercase tracking-wide">Voted High</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {optimists.map(({ userName, vote }) => (
+                  <span
+                    key={userName}
+                    className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 text-xs font-semibold px-2 py-1 rounded-lg"
+                  >
+                    {userName.split(' ')[0]}
+                    <span className="bg-rose-200 px-1 rounded font-mono">{vote}</span>
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-rose-600 italic">Ask: why did you vote high?</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Distribution */}
       <div>
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
@@ -118,15 +198,25 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate }:
                   </span>
                 </div>
                 <div className="flex gap-1 flex-wrap pl-0">
-                  {voters.map((name) => (
-                    <span
-                      key={name}
-                      className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md font-medium"
-                      title={name}
-                    >
-                      {name.split(' ')[0]}
-                    </span>
-                  ))}
+                  {voters.map((name) => {
+                    const vNum = parseVote(vote);
+                    const isLow = hasDivergence && vNum !== null && fibIndex(vNum) <= minIdx + 1;
+                    const isHigh = hasDivergence && vNum !== null && fibIndex(vNum) >= maxIdx - 1;
+                    return (
+                      <span
+                        key={name}
+                        className={clsx(
+                          'text-xs px-1.5 py-0.5 rounded-md font-medium',
+                          isLow ? 'bg-blue-100 text-blue-700' :
+                          isHigh ? 'bg-rose-100 text-rose-700' :
+                          'bg-slate-100 text-slate-600'
+                        )}
+                        title={name}
+                      >
+                        {name.split(' ')[0]}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             </div>
