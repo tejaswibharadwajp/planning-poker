@@ -1,9 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+let supabase: SupabaseClient | null = null;
+
+if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+} else {
+  console.warn('Supabase env vars missing — DB persistence disabled');
+}
 
 export async function dbCreateRoom(room: {
   id: string;
@@ -11,6 +14,7 @@ export async function dbCreateRoom(room: {
   name: string;
   adminId: string;
 }) {
+  if (!supabase) return;
   await supabase.from('rooms').insert({
     id: room.id,
     code: room.code,
@@ -25,6 +29,7 @@ export async function dbCreateStory(story: {
   title: string;
   description: string;
 }) {
+  if (!supabase) return;
   await supabase.from('stories').insert({
     id: story.id,
     room_id: story.roomId,
@@ -40,6 +45,7 @@ export async function dbUpsertVote(vote: {
   userName: string;
   vote: string;
 }) {
+  if (!supabase) return;
   await supabase.from('story_votes').upsert(
     {
       story_id: vote.storyId,
@@ -52,6 +58,7 @@ export async function dbUpsertVote(vote: {
 }
 
 export async function dbSetStoryEstimate(storyId: string, estimate: string) {
+  if (!supabase) return;
   await supabase
     .from('stories')
     .update({ estimate, status: 'done' })
@@ -62,5 +69,6 @@ export async function dbUpdateStoryStatus(
   storyId: string,
   status: 'pending' | 'voting' | 'revealed' | 'done'
 ) {
+  if (!supabase) return;
   await supabase.from('stories').update({ status }).eq('id', storyId);
 }
