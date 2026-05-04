@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, List, Link } from 'lucide-react';
+import { X, Plus, List, Link, Trello } from 'lucide-react';
+import ADOImport from './ADOImport';
 
 interface Props {
   onAdd: (title: string, description?: string) => void;
   onClose: () => void;
 }
 
-type Tab = 'single' | 'bulk' | 'import';
+type Tab = 'single' | 'bulk' | 'import' | 'ado';
 
 function extractTicketId(line: string): string | null {
   // Jira: .../browse/PROJ-123
@@ -78,6 +79,7 @@ export default function AddStoryModal({ onAdd, onClose }: Props) {
     { key: 'single', label: 'Single', icon: Plus },
     { key: 'bulk', label: 'Bulk', icon: List },
     { key: 'import', label: 'Jira / Linear', icon: Link },
+    { key: 'ado', label: 'Azure DevOps', icon: Trello },
   ];
 
   return (
@@ -244,6 +246,11 @@ export default function AddStoryModal({ onAdd, onClose }: Props) {
               </button>
             </div>
           </form>
+        )}
+
+        {/* Azure DevOps */}
+        {tab === 'ado' && (
+          <ADOImport onAdd={(title) => onAdd(title)} onClose={onClose} />
         )}
       </div>
     </div>
