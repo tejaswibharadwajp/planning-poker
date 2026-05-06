@@ -8,15 +8,19 @@ interface Props {
   isAdmin: boolean;
   onRevote: () => void;
   onSetEstimate: (estimate: string) => void;
+  cards?: string[];
 }
 
-const NUMERIC_CARDS = FIBONACCI_CARDS.filter((c) => !isNaN(parseFloat(c)));
-const NUMERIC_VALUES = NUMERIC_CARDS.map((c) => (c === '½' ? 0.5 : parseFloat(c)));
+function makeCardIndex(cards: string[]) {
+  const numericCards = cards.filter((c) => !isNaN(parseFloat(c)));
+  const numericValues = numericCards.map((c) => (c === '½' ? 0.5 : parseFloat(c)));
+  return { numericCards, numericValues };
+}
 
-function fibIndex(v: number): number {
+function cardIndex(v: number, numericValues: number[]): number {
   let closest = 0;
   let minDist = Infinity;
-  NUMERIC_VALUES.forEach((fv, i) => {
+  numericValues.forEach((fv, i) => {
     const d = Math.abs(fv - v);
     if (d < minDist) { minDist = d; closest = i; }
   });
@@ -29,8 +33,11 @@ function parseVote(v: string): number | null {
   return isNaN(n) ? null : n;
 }
 
-export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate }: Props) {
+export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate, cards = FIBONACCI_CARDS }: Props) {
   const [customEstimate, setCustomEstimate] = useState('');
+
+  const { numericCards, numericValues } = makeCardIndex(cards);
+  const fi = (v: number) => cardIndex(v, numericValues);
 
   const votes = Object.values(story.votes);
   const numericVotes = votes
@@ -53,8 +60,8 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate }:
   });
 
   const sortedDistribution = Object.entries(distribution).sort(([a], [b]) => {
-    const ia = FIBONACCI_CARDS.indexOf(a);
-    const ib = FIBONACCI_CARDS.indexOf(b);
+    const ia = cards.indexOf(a);
+    const ib = cards.indexOf(b);
     return ia - ib;
   });
 
@@ -62,28 +69,28 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate }:
   const isConsensus = Object.keys(distribution).length === 1 && votes.length > 0;
 
   // Divergence detection
-  const minIdx = minVote !== null ? fibIndex(minVote) : 0;
-  const maxIdx = maxVote !== null ? fibIndex(maxVote) : 0;
+  const minIdx = minVote !== null ? fi(minVote) : 0;
+  const maxIdx = maxVote !== null ? fi(maxVote) : 0;
   const spread = maxIdx - minIdx;
   const hasDivergence = !isConsensus && numericVotes.length >= 2 && spread >= 2;
 
   const skeptics = hasDivergence
     ? votes.filter((v) => {
         const n = parseVote(v.vote);
-        return n !== null && fibIndex(n) <= minIdx + 1;
+        return n !== null && fi(n) <= minIdx + 1;
       })
     : [];
   const optimists = hasDivergence
     ? votes.filter((v) => {
         const n = parseVote(v.vote);
-        return n !== null && fibIndex(n) >= maxIdx - 1;
+        return n !== null && fi(n) >= maxIdx - 1;
       })
     : [];
 
-  // Suggested estimate: nearest Fibonacci to average
+  // Suggested estimate: nearest numeric card to average
   const suggested =
-    avg !== null
-      ? NUMERIC_CARDS.reduce((closest, card) => {
+    avg !== null && numericCards.length > 0
+      ? numericCards.reduce((closest, card) => {
           const diff = Math.abs(parseFloat(card) - avg);
           const closestDiff = Math.abs(parseFloat(closest) - avg);
           return diff < closestDiff ? card : closest;
@@ -200,8 +207,8 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate }:
                 <div className="flex gap-1 flex-wrap pl-0">
                   {voters.map((name) => {
                     const vNum = parseVote(vote);
-                    const isLow = hasDivergence && vNum !== null && fibIndex(vNum) <= minIdx + 1;
-                    const isHigh = hasDivergence && vNum !== null && fibIndex(vNum) >= maxIdx - 1;
+                    const isLow = hasDivergence && vNum !== null && fi(vNum) <= minIdx + 1;
+                    const isHigh = hasDivergence && vNum !== null && fi(vNum) >= maxIdx - 1;
                     return (
                       <span
                         key={name}
@@ -237,7 +244,7 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate }:
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-slate-500">Suggested:</span>
               {[suggested].concat(
-                FIBONACCI_CARDS.filter(
+                cards.filter(
                   (c) => c !== suggested && c !== '?' && c !== '☕'
                 ).slice(0, 4)
               ).map((card) => (

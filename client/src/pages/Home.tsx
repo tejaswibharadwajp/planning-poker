@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import { useUser, useClerk, SignInButton } from '@clerk/clerk-react';
+import { DeckType, DECK_LABELS } from '../types';
 
 const CARD_VALUES = ['1', '2', '3', '5', '8', '13'];
 const CARD_COLORS = [
@@ -52,6 +53,7 @@ export default function Home() {
   const [roomCode, setRoomCode] = useState('');
   const [isSpectator, setIsSpectator] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deckType, setDeckType] = useState<DeckType>('fibonacci');
 
   useEffect(() => {
     if (user && !userName) {
@@ -75,7 +77,7 @@ export default function Home() {
     if (!userName.trim()) return;
     setLoading(true);
     clearError();
-    joinRoom({ userName: userName.trim(), roomName: roomName.trim() || undefined });
+    joinRoom({ userName: userName.trim(), roomName: roomName.trim() || undefined, deckType });
   };
 
   const handleJoin = (e: React.FormEvent) => {
@@ -262,6 +264,25 @@ export default function Home() {
                       maxLength={64}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder-slate-400 text-sm"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Card deck</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(Object.keys(DECK_LABELS) as DeckType[]).map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setDeckType(key)}
+                          className={`px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                            deckType === key
+                              ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                              : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          {DECK_LABELS[key]}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <button
                     type="submit"

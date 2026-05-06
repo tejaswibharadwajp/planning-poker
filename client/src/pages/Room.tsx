@@ -15,10 +15,13 @@ import {
   Loader2,
   AlertCircle,
   VolumeX,
+  Crown,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import { useUser } from '@clerk/clerk-react';
 import { writeBackToADO } from '../utils/adoWriteBack';
+import { writeBackToJira } from '../utils/jiraWriteBack';
+import { DECK_CARDS } from '../types';
 import StoryPanel from '../components/StoryPanel';
 import VotingCards from '../components/VotingCards';
 import ParticipantsPanel from '../components/ParticipantsPanel';
@@ -52,12 +55,14 @@ export default function Room() {
     sendReaction,
     leaveRoom,
     startQuickVote,
+    upgradePlan,
   } = useSocket();
 
   const { user } = useUser();
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
+  const [writeBackToast, setWriteBackToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   // Direct URL join state — pre-fill from Clerk
   const [joinName, setJoinName] = useState(
@@ -69,7 +74,16 @@ export default function Room() {
     setEstimate(storyId, estimate);
     const story = room?.stories.find((s) => s.id === storyId);
     if (story) {
-      writeBackToADO(story.title, estimate).catch(() => {/* silent */});
+      const showToast = (msg: string, ok: boolean) => {
+        setWriteBackToast({ msg, ok });
+        setTimeout(() => setWriteBackToast(null), 3000);
+      };
+      writeBackToADO(story.title, estimate)
+        .then((ok) => { if (ok) showToast('ADO updated', true); })
+        .catch(() => {});
+      writeBackToJira(story.title, estimate)
+        .then((ok) => { if (ok) showToast('Jira updated', true); })
+        .catch(() => {});
     }
   };
 
@@ -183,6 +197,8 @@ export default function Room() {
 
   const currentUser = room.users.find((u) => u.id === userId) ?? null;
   const isAdmin = currentUser?.isAdmin ?? false;
+  const deckCards = DECK_CARDS[room.deckType] ?? DECK_CARDS.fibonacci;
+  const isAtFreeLimit = room.plan === 'free' && room.users.filter((u) => u.isConnected && !u.isSpectator).length >= 7;
   const isSpectator = currentUser?.isSpectator ?? false;
   const isMuted = currentUser?.isMuted ?? false;
   const activeStory = room.stories.find((s) => s.id === room.activeStoryId) ?? null;
@@ -215,6 +231,14 @@ export default function Room() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+      {/* ── Write-back toast ── */}
+      {writeBackToast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg text-sm font-semibold ${writeBackToast.ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+          <Check className="w-4 h-4" />
+          {writeBackToast.msg}
+        </div>
+      )}
+
       {/* ── Floating reactions overlay ── */}
       <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
         {reactions.map((r) => (
@@ -239,9 +263,25 @@ export default function Room() {
         </div>
 
         {/* Room name */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex items-center gap-2">
           <h1 className="text-white font-semibold text-sm truncate">{room.name}</h1>
+          {room.plan === 'pro' && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
+              <Crown className="w-2.5 h-2.5" />PRO
+            </span>
+          )}
         </div>
+
+        {/* Upgrade nudge */}
+        {isAdmin && isAtFreeLimit && (
+          <button
+            onClick={upgradePlan}
+            className="hidden sm:flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Crown className="w-3 h-3" />
+            Upgrade
+          </button>
+        )}
 
         {/* Room code */}
         <button
@@ -442,6 +482,7 @@ export default function Room() {
                           selectedVote={myVote}
                           onVote={(v) => submitVote(activeStory.id, v)}
                           disabled={false}
+                          cards={deckCards}
                         />
 
                         {/* Reveal button for admin */}
@@ -483,6 +524,7 @@ export default function Room() {
                       isAdmin={isAdmin}
                       onRevote={() => resetVotes(activeStory.id)}
                       onSetEstimate={(est) => handleSetEstimate(activeStory.id, est)}
+                      cards={deckCards}
                     />
                   </div>
                 )}
