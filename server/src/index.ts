@@ -47,6 +47,8 @@ interface Room {
   stories: Story[];
   activeStoryId: string | null;
   createdAt: number;
+  plan: 'free' | 'pro';
+  deckType: string;
 }
 
 const rooms = new Map<string, Room>();
@@ -118,12 +120,14 @@ io.on('connection', (socket) => {
       userName,
       isSpectator = false,
       clerkUserId,
+      deckType = 'fibonacci',
     }: {
       roomName?: string;
       roomCode?: string;
       userName: string;
       isSpectator?: boolean;
       clerkUserId?: string;
+      deckType?: string;
     }) => {
       let room: Room;
       const userId = uuidv4();
@@ -137,6 +141,18 @@ io.on('connection', (socket) => {
           return;
         }
         room = existing;
+
+        // Enforce 5-seat free plan limit for non-spectators
+        if (!isSpectator && room.plan === 'free') {
+          const votingCount = room.users.filter((u) => u.isConnected && !u.isSpectator).length;
+          if (votingCount >= 7) {
+            socket.emit('error', {
+              message: 'Room is at the 7-member free limit. Ask the facilitator to upgrade to Pro.',
+            });
+            return;
+          }
+        }
+
         room.users.push({
           id: userId,
           socketId: socket.id,
@@ -173,6 +189,8 @@ io.on('connection', (socket) => {
           stories: [],
           activeStoryId: null,
           createdAt: Date.now(),
+          plan: 'free',
+          deckType: deckType || 'fibonacci',
         };
         rooms.set(room.id, room);
         // Persist room to DB (fire-and-forget)
@@ -417,6 +435,15 @@ io.on('connection', (socket) => {
     if (!target || target.id === user.id) return;
 
     target.isMuted = !target.isMuted;
+    io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
+  });
+
+  socket.on('upgrade-plan', () => {
+    const room = getRoomByCode(socket.data.roomCode);
+    if (!room) return;
+    const user = room.users.find((u) => u.id === socket.data.userId);
+    if (!user?.isAdmin) return;
+    room.plan = 'pro';
     io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
   });
 

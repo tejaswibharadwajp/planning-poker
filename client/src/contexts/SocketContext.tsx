@@ -26,7 +26,9 @@ interface SocketContextValue {
     roomCode?: string;
     userName: string;
     isSpectator?: boolean;
+    deckType?: string;
   }) => void;
+  upgradePlan: () => void;
   addStory: (title: string, description?: string) => void;
   deleteStory: (storyId: string) => void;
   selectStory: (storyId: string) => void;
@@ -128,7 +130,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const joinRoom = useCallback(
-    (params: { roomName?: string; roomCode?: string; userName: string; isSpectator?: boolean }) => {
+    (params: { roomName?: string; roomCode?: string; userName: string; isSpectator?: boolean; deckType?: string }) => {
       sessionStorage.setItem(
         'poker_session',
         JSON.stringify({
@@ -143,6 +145,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     },
     [clerkUserId, user]
+  );
+
+  const upgradePlan = useCallback(
+    () => socketRef.current?.emit('upgrade-plan'),
+    []
   );
 
   const startQuickVote = useCallback(
@@ -250,6 +257,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         sendReaction,
         leaveRoom,
         clearError,
+        upgradePlan,
       }}
     >
       {children}

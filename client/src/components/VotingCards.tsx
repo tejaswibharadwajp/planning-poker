@@ -6,6 +6,7 @@ interface Props {
   selectedVote: string | null;
   onVote: (vote: string) => void;
   disabled?: boolean;
+  cards?: string[];
 }
 
 const CARD_GRADIENT: Record<string, string> = {
@@ -40,7 +41,7 @@ const CARD_ACCENT: Record<string, string> = {
   '☕':  'text-amber-700 hover:border-amber-600 hover:shadow-amber-100',
 };
 
-export default function VotingCards({ selectedVote, onVote, disabled }: Props) {
+export default function VotingCards({ selectedVote, onVote, disabled, cards = FIBONACCI_CARDS }: Props) {
   const [localVote, setLocalVote] = useState<string | null>(selectedVote);
 
   // Sync only when server clears/changes vote (story reset, new story)
@@ -61,7 +62,7 @@ export default function VotingCards({ selectedVote, onVote, disabled }: Props) {
       </p>
 
       <div className="flex flex-wrap gap-3 justify-center">
-        {FIBONACCI_CARDS.map((card) => {
+        {cards.map((card) => {
           const isSelected = localVote === card;
           const gradient = CARD_GRADIENT[card] || 'from-indigo-500 to-indigo-700';
           const accent = CARD_ACCENT[card] || 'text-indigo-500 hover:border-indigo-400';

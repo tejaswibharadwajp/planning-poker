@@ -31,6 +31,22 @@ export interface Story {
   status: 'pending' | 'voting' | 'revealed' | 'done';
 }
 
+export type DeckType = 'fibonacci' | 'tshirt' | 'powers2' | 'risk';
+
+export const DECK_CARDS: Record<DeckType, string[]> = {
+  fibonacci: ['0', '½', '1', '2', '3', '5', '8', '13', '21', '40', '100', '☕'],
+  tshirt:    ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?'],
+  powers2:   ['1', '2', '4', '8', '16', '32', '64', '?'],
+  risk:      ['1', '2', '3', '4', '5'],
+};
+
+export const DECK_LABELS: Record<DeckType, string> = {
+  fibonacci: 'Fibonacci',
+  tshirt:    'T-Shirt Sizes',
+  powers2:   'Powers of 2',
+  risk:      'Risk (1–5)',
+};
+
 export interface Room {
   id: string;
   name: string;
@@ -39,11 +55,11 @@ export interface Room {
   stories: Story[];
   activeStoryId: string | null;
   createdAt: number;
+  plan: 'free' | 'pro';
+  deckType: DeckType;
 }
 
-export const FIBONACCI_CARDS = [
-  '0', '½', '1', '2', '3', '5', '8', '13', '21', '40', '100', '☕',
-];
+export const FIBONACCI_CARDS = DECK_CARDS.fibonacci;
 
 export const AVATAR_COLORS = [
   'bg-indigo-500',
