@@ -16,6 +16,7 @@ import {
   AlertCircle,
   VolumeX,
   Crown,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import { useUser } from '@clerk/clerk-react';
@@ -26,6 +27,7 @@ import StoryPanel from '../components/StoryPanel';
 import VotingCards from '../components/VotingCards';
 import ParticipantsPanel from '../components/ParticipantsPanel';
 import VoteResults from '../components/VoteResults';
+import FeedbackModal from '../components/FeedbackModal';
 import clsx from 'clsx';
 
 const REACTION_EMOJIS = ['👍', '🔥', '😬', '🤔', '🎉'];
@@ -59,6 +61,7 @@ export default function Room() {
   } = useSocket();
 
   const { user } = useUser();
+  const [showFeedback, setShowFeedback] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
@@ -564,6 +567,22 @@ export default function Room() {
           />
         </div>
       </div>
+
+      {/* Floating feedback pill */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105 active:scale-95 transition-all duration-150"
+      >
+        <MessageSquarePlus className="w-4 h-4 flex-shrink-0" />
+        Feedback
+      </button>
+
+      {showFeedback && (
+        <FeedbackModal
+          onClose={() => setShowFeedback(false)}
+          defaultName={user?.fullName || user?.firstName || ''}
+        />
+      )}
     </div>
   );
 }

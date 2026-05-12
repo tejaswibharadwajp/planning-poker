@@ -1,12 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, ArrowRight, Loader2, AlertCircle, Zap, Users,
-  BarChart2, Shield, LogOut, Download, GitMerge, Eye,
+  Plus, ArrowRight, Loader2, AlertCircle, Zap,
+  BarChart2, Shield, LogOut, Download, GitMerge, Eye, Star, MessageSquarePlus,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import { useUser, useClerk, SignInButton } from '@clerk/clerk-react';
 import { DeckType, DECK_LABELS } from '../types';
+import FeedbackModal from '../components/FeedbackModal';
+
+const SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
+interface Testimonial {
+  id: string;
+  name: string;
+  role: string | null;
+  quote: string;
+  rating: number;
+  created_at: string;
+}
 
 const CARD_VALUES = ['1', '2', '3', '5', '8', '13'];
 const CARD_COLORS = [
@@ -54,6 +66,8 @@ export default function Home() {
   const [isSpectator, setIsSpectator] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deckType, setDeckType] = useState<DeckType>('fibonacci');
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     if (user && !userName) {
@@ -71,6 +85,13 @@ export default function Home() {
   useEffect(() => {
     if (error) setLoading(false);
   }, [error]);
+
+  useEffect(() => {
+    fetch(`${SERVER_URL}/api/testimonials`)
+      .then((r) => r.json())
+      .then((d) => setTestimonials(d.testimonials || []))
+      .catch(() => {});
+  }, []);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -383,11 +404,54 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Testimonials ── */}
+      {testimonials.length > 0 && (
+        <section className="px-4 py-12 max-w-5xl mx-auto w-full">
+          <h2 className="text-center text-2xl font-bold text-white mb-2">What teams are saying</h2>
+          <p className="text-center text-slate-500 text-sm mb-10">Real feedback from real sprint teams.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {testimonials.map((t) => (
+              <div key={t.id} className="p-5 rounded-2xl bg-white/5 border border-white/8 flex flex-col gap-3">
+                <div className="flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`w-4 h-4 ${s <= t.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-700'}`}
+                    />
+                  ))}
+                </div>
+                <p className="text-slate-300 text-sm leading-relaxed flex-1">"{t.quote}"</p>
+                <div>
+                  <p className="text-white text-sm font-semibold">{t.name}</p>
+                  {t.role && <p className="text-slate-500 text-xs mt-0.5">{t.role}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Floating feedback pill ── */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105 active:scale-95 transition-all duration-150"
+      >
+        <MessageSquarePlus className="w-4 h-4 flex-shrink-0" />
+        Feedback
+      </button>
+
       {/* ── Footer ── */}
       <footer className="border-t border-white/5 px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-600 text-xs">
         <span>Sprint Planner · Real-time Planning Poker</span>
         <span>Free forever · No account required</span>
       </footer>
+
+      {showFeedback && (
+        <FeedbackModal
+          onClose={() => setShowFeedback(false)}
+          defaultName={user?.fullName || user?.firstName || ''}
+        />
+      )}
     </div>
   );
 }

@@ -72,3 +72,37 @@ export async function dbUpdateStoryStatus(
   if (!supabase) return;
   await supabase.from('stories').update({ status }).eq('id', storyId);
 }
+
+export async function dbSubmitFeedback(feedback: {
+  name: string;
+  role?: string;
+  quote: string;
+  rating: number;
+}) {
+  if (!supabase) return;
+  await supabase.from('testimonials').insert({
+    name: feedback.name,
+    role: feedback.role || null,
+    quote: feedback.quote,
+    rating: feedback.rating,
+    approved: false,
+  });
+}
+
+export async function dbGetTestimonials(): Promise<Array<{
+  id: string;
+  name: string;
+  role: string | null;
+  quote: string;
+  rating: number;
+  created_at: string;
+}>> {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('testimonials')
+    .select('id, name, role, quote, rating, created_at')
+    .eq('approved', true)
+    .order('created_at', { ascending: false })
+    .limit(12);
+  return data || [];
+}

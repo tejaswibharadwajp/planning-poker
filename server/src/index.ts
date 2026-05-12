@@ -3,6 +3,8 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
 import {
   dbCreateRoom,
@@ -10,7 +12,13 @@ import {
   dbUpsertVote,
   dbSetStoryEstimate,
   dbUpdateStoryStatus,
+  dbSubmitFeedback,
+  dbGetTestimonials,
 } from './db';
+
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : ['http://localhost:5173', 'http://localhost:4173'];
 
 interface User {
   id: string;
@@ -99,18 +107,111 @@ function sanitizeRoom(room: Room) {
 }
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Trust the first proxy hop (Render/Railway/Fly set X-Forwarded-For)
+app.set('trust proxy', 1);
+
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// CORS — restrict to known frontend origins
+app.use(cors({
+  origin: (origin, cb) => {
+    // allow server-to-server / curl in dev (no origin header)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  methods: ['GET', 'POST'],
+}));
+
+app.use(express.json({ limit: '16kb' }));
+
+// Rate limiters
+const generalLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const feedbackLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many feedback submissions. Try again in 15 minutes.' },
+});
+
+app.use(generalLimiter);
 
 app.get('/health', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
 
+app.get('/api/testimonials', async (_req, res) => {
+  try {
+    const testimonials = await dbGetTestimonials();
+    res.json({ testimonials });
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch testimonials' });
+  }
+});
+
+app.post('/api/feedback', feedbackLimiter, async (req, res) => {
+  const { name, role, quote, rating } = req.body;
+  if (!name || typeof name !== 'string' || name.trim().length < 2) {
+    res.status(400).json({ error: 'Name required (min 2 chars)' });
+    return;
+  }
+  if (!quote || typeof quote !== 'string' || quote.trim().length < 10) {
+    res.status(400).json({ error: 'Feedback required (min 10 chars)' });
+    return;
+  }
+  if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
+    res.status(400).json({ error: 'Rating must be 1–5' });
+    return;
+  }
+  try {
+    await dbSubmitFeedback({
+      name: name.trim().slice(0, 64),
+      role: role ? String(role).trim().slice(0, 64) : undefined,
+      quote: quote.trim().slice(0, 500),
+      rating,
+    });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'Failed to save feedback' });
+  }
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] },
+  maxHttpBufferSize: 16 * 1024, // 16 KB max payload per socket message
 });
+
+// Per-socket event rate limiter: returns true if event should be dropped
+function socketRateLimited(
+  store: Map<string, number[]>,
+  key: string,
+  maxPerWindow: number,
+  windowMs: number,
+): boolean {
+  const now = Date.now();
+  const hits = (store.get(key) || []).filter((t) => now - t < windowMs);
+  if (hits.length >= maxPerWindow) return true;
+  hits.push(now);
+  store.set(key, hits);
+  return false;
+}
 
 io.on('connection', (socket) => {
   console.log('Connected:', socket.id);
+
+  // Per-connection rate limit buckets
+  const rateBuckets = new Map<string, number[]>();
+  const limited = (event: string, max: number, windowMs: number) =>
+    socketRateLimited(rateBuckets, event, max, windowMs);
 
   socket.on(
     'join-room',
@@ -286,6 +387,7 @@ io.on('connection', (socket) => {
   socket.on(
     'add-story',
     ({ title, description }: { title: string; description?: string }) => {
+      if (limited('add-story', 10, 60_000)) return; // max 10 per min
       const room = getRoomByCode(socket.data.roomCode);
       if (!room) return;
       const user = room.users.find((u) => u.id === socket.data.userId);
@@ -337,6 +439,7 @@ io.on('connection', (socket) => {
   socket.on(
     'submit-vote',
     ({ storyId, vote }: { storyId: string; vote: string }) => {
+      if (limited('submit-vote', 10, 10_000)) return; // max 10 per 10s
       const room = getRoomByCode(socket.data.roomCode);
       if (!room) return;
       const user = room.users.find((u) => u.id === socket.data.userId);
@@ -448,6 +551,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send-reaction', ({ emoji }: { emoji: string }) => {
+    if (limited('send-reaction', 5, 3_000)) return; // max 5 per 3s
     const room = getRoomByCode(socket.data.roomCode);
     if (!room) return;
     const user = room.users.find((u) => u.id === socket.data.userId);
@@ -462,6 +566,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    rateBuckets.clear();
     const room = getRoomByCode(socket.data.roomCode);
     if (!room) return;
     const user = room.users.find((u) => u.id === socket.data.userId);
