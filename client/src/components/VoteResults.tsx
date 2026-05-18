@@ -114,7 +114,7 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate, c
       {numericVotes.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Average', value: avg !== null ? avg.toFixed(1) : '—', cls: 'bg-indigo-50 border-indigo-100 text-indigo-700 text-indigo-500' },
+            { label: 'Average', value: avg !== null ? (Number.isInteger(avg) ? String(avg) : avg.toFixed(1)) : '—', cls: 'bg-indigo-50 border-indigo-100 text-indigo-700 text-indigo-500' },
             { label: 'Min', value: minVote !== null ? String(minVote) : '—', cls: 'bg-blue-50 border-blue-100 text-blue-700 text-blue-500' },
             { label: 'Max', value: maxVote !== null ? String(maxVote) : '—', cls: 'bg-rose-50 border-rose-100 text-rose-700 text-rose-500' },
           ].map(({ label, value, cls }) => {
@@ -274,11 +274,12 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate, c
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && customEstimate.trim()) {
                   onSetEstimate(customEstimate.trim());
+                  setCustomEstimate('');
                 }
               }}
             />
             <button
-              onClick={() => customEstimate.trim() && onSetEstimate(customEstimate.trim())}
+              onClick={() => { if (customEstimate.trim()) { onSetEstimate(customEstimate.trim()); setCustomEstimate(''); } }}
               disabled={!customEstimate.trim()}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5"
             >

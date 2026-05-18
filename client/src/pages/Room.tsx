@@ -17,12 +17,13 @@ import {
   VolumeX,
   Crown,
   MessageSquarePlus,
+  Timer,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import { useUser } from '@clerk/clerk-react';
 import { writeBackToADO } from '../utils/adoWriteBack';
 import { writeBackToJira } from '../utils/jiraWriteBack';
-import { DECK_CARDS } from '../types';
+import { DECK_CARDS, FREE_VOTER_LIMIT } from '../types';
 import StoryPanel from '../components/StoryPanel';
 import VotingCards from '../components/VotingCards';
 import ParticipantsPanel from '../components/ParticipantsPanel';
@@ -66,6 +67,7 @@ export default function Room() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
   const [writeBackToast, setWriteBackToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [elapsedSecs, setElapsedSecs] = useState(0);
 
   // Direct URL join state — pre-fill from Clerk
   const [joinName, setJoinName] = useState(
@@ -108,6 +110,53 @@ export default function Room() {
   useEffect(() => {
     if (room || error) setJoinLoading(false);
   }, [room, error]);
+
+  useEffect(() => {
+    if (!room?.votingStartedAt) { setElapsedSecs(0); return; }
+    const update = () => setElapsedSecs(Math.floor((Date.now() - room.votingStartedAt!) / 1000));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [room?.votingStartedAt]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!room) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      const me = room.users.find((u) => u.id === userId);
+      if (!me) return;
+
+      const activeStory = room.stories.find((s) => s.id === room.activeStoryId) ?? null;
+      const deckCards = DECK_CARDS[room.deckType] ?? DECK_CARDS.fibonacci;
+
+      // 1–9: select Nth card (1-indexed)
+      const digit = parseInt(e.key);
+      if (!isNaN(digit) && digit >= 1 && digit <= 9) {
+        const card = deckCards[digit - 1];
+        if (card && activeStory?.status === 'voting' && !me.isSpectator && !me.isMuted) {
+          submitVote(activeStory.id, card);
+        }
+        return;
+      }
+
+      // Space: reveal votes (admin, voting phase)
+      if (e.key === ' ' && me.isAdmin && activeStory?.status === 'voting') {
+        e.preventDefault();
+        revealVotes(activeStory.id);
+        return;
+      }
+
+      // r/R: revote (admin, revealed phase)
+      if ((e.key === 'r' || e.key === 'R') && me.isAdmin && activeStory?.status === 'revealed') {
+        resetVotes(activeStory.id);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [room, userId, submitVote, revealVotes, resetVotes]);
 
   if (!room && hasValidSession) {
     return (
@@ -201,7 +250,7 @@ export default function Room() {
   const currentUser = room.users.find((u) => u.id === userId) ?? null;
   const isAdmin = currentUser?.isAdmin ?? false;
   const deckCards = DECK_CARDS[room.deckType] ?? DECK_CARDS.fibonacci;
-  const isAtFreeLimit = room.plan === 'free' && room.users.filter((u) => u.isConnected && !u.isSpectator).length >= 7;
+  const isAtFreeLimit = room.plan === 'free' && room.users.filter((u) => u.isConnected && !u.isSpectator).length >= FREE_VOTER_LIMIT;
   const isSpectator = currentUser?.isSpectator ?? false;
   const isMuted = currentUser?.isMuted ?? false;
   const activeStory = room.stories.find((s) => s.id === room.activeStoryId) ?? null;
@@ -262,7 +311,7 @@ export default function Room() {
           <div className="w-7 h-7 bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/30 flex-shrink-0">
             <span className="text-white font-bold text-sm">♠</span>
           </div>
-          <span className="text-white font-semibold text-sm hidden sm:block">Sprint Planner</span>
+          <span className="text-white font-semibold text-sm hidden sm:block">Plan by Poker</span>
         </div>
 
         {/* Room name */}
@@ -449,9 +498,14 @@ export default function Room() {
                           {activeStory.status === 'pending' && 'Pending'}
                         </span>
                         {votingPhase && (
-                          <span className="text-xs text-slate-500">
-                            {votedCount}/{votingUsers.length} voted
-                            {allVoted && ' · All in!'}
+                          <span className="text-xs text-slate-500 flex items-center gap-2">
+                            <span>{votedCount}/{votingUsers.length} voted{allVoted && ' · All in!'}</span>
+                            {elapsedSecs > 0 && (
+                              <span className={clsx('inline-flex items-center gap-1 font-mono', elapsedSecs >= 120 ? 'text-red-500' : elapsedSecs >= 60 ? 'text-amber-500' : 'text-slate-400')}>
+                                <Timer className="w-3 h-3" />
+                                {Math.floor(elapsedSecs / 60)}:{String(elapsedSecs % 60).padStart(2, '0')}
+                              </span>
+                            )}
                           </span>
                         )}
                       </div>
@@ -486,6 +540,7 @@ export default function Room() {
                           onVote={(v) => submitVote(activeStory.id, v)}
                           disabled={false}
                           cards={deckCards}
+                          deckType={room.deckType}
                         />
 
                         {/* Reveal button for admin */}

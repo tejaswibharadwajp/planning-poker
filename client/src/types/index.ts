@@ -33,6 +33,8 @@ export interface Story {
 
 export type DeckType = 'fibonacci' | 'tshirt' | 'powers2' | 'risk';
 
+export const FREE_VOTER_LIMIT = 7;
+
 export const DECK_CARDS: Record<DeckType, string[]> = {
   fibonacci: ['0', '½', '1', '2', '3', '5', '8', '13', '21', '40', '100', '☕'],
   tshirt:    ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?'],
@@ -57,6 +59,7 @@ export interface Room {
   createdAt: number;
   plan: 'free' | 'pro';
   deckType: DeckType;
+  votingStartedAt: number | null;
 }
 
 export const FIBONACCI_CARDS = DECK_CARDS.fibonacci;

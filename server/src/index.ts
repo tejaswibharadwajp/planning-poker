@@ -57,6 +57,7 @@ interface Room {
   createdAt: number;
   plan: 'free' | 'pro';
   deckType: string;
+  votingStartedAt: number | null;
 }
 
 const rooms = new Map<string, Room>();
@@ -292,6 +293,7 @@ io.on('connection', (socket) => {
           createdAt: Date.now(),
           plan: 'free',
           deckType: deckType || 'fibonacci',
+          votingStartedAt: null,
         };
         rooms.set(room.id, room);
         // Persist room to DB (fire-and-forget)
@@ -377,6 +379,7 @@ io.on('connection', (socket) => {
     };
     room.stories.push(story);
     room.activeStoryId = story.id;
+    room.votingStartedAt = Date.now();
     room.users.forEach((u) => {
       u.vote = null;
       u.hasVoted = false;
@@ -429,6 +432,7 @@ io.on('connection', (socket) => {
     room.activeStoryId = storyId;
     const story = room.stories.find((s) => s.id === storyId);
     if (story && story.status === 'pending') story.status = 'voting';
+    room.votingStartedAt = Date.now();
     room.users.forEach((u) => {
       u.vote = null;
       u.hasVoted = false;
@@ -465,6 +469,7 @@ io.on('connection', (socket) => {
     if (!story) return;
 
     story.status = 'revealed';
+    room.votingStartedAt = null;
     dbUpdateStoryStatus(storyId, 'revealed').catch(console.error);
     io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
   });
@@ -479,6 +484,7 @@ io.on('connection', (socket) => {
 
     story.votes = {};
     story.status = 'voting';
+    room.votingStartedAt = Date.now();
     room.users.forEach((u) => {
       u.vote = null;
       u.hasVoted = false;
@@ -499,6 +505,7 @@ io.on('connection', (socket) => {
       story.finalEstimate = estimate;
       story.status = 'done';
       room.activeStoryId = null;
+      room.votingStartedAt = null;
       dbSetStoryEstimate(storyId, estimate).catch(console.error);
       io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
     }

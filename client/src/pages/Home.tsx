@@ -125,7 +125,7 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 flex flex-col" itemScope itemType="https://schema.org/WebPage">
 
       {/* ── Nav ── */}
       <nav className="px-6 sm:px-10 py-4 flex items-center justify-between border-b border-white/5">
@@ -133,7 +133,7 @@ export default function Home() {
           <div className="w-9 h-9 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/40">
             <span className="text-white font-bold text-lg">♠</span>
           </div>
-          <span className="text-white font-bold text-lg tracking-tight">Sprint Planner</span>
+          <span className="text-white font-bold text-lg tracking-tight">Plan by Poker</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -167,6 +167,7 @@ export default function Home() {
         </div>
       </nav>
 
+      <main>
       {/* ── Hero ── */}
       <section className="flex flex-col items-center text-center px-4 pt-16 pb-10">
         <div className="inline-flex items-center gap-2 bg-indigo-500/15 text-indigo-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-8 border border-indigo-500/25">
@@ -431,6 +432,8 @@ export default function Home() {
         </section>
       )}
 
+      </main>
+
       {/* ── Floating feedback pill ── */}
       <button
         onClick={() => setShowFeedback(true)}
@@ -442,7 +445,7 @@ export default function Home() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-white/5 px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-600 text-xs">
-        <span>Sprint Planner · Real-time Planning Poker</span>
+        <span>Plan by Poker · Free Real-Time Planning Poker for Agile Teams</span>
         <span>Free forever · No account required</span>
       </footer>
 

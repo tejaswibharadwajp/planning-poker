@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /room/
+
+Sitemap: https://planbypoker.com/sitemap.xml
