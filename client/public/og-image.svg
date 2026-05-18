@@ -1,0 +1,60 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E8E6DF" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#534AB7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#FAFAF8"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+
+  <!-- === ICON GROUP === -->
+  <g transform="translate(260, 315)">
+
+    <!-- Back card (rotated left) -->
+    <g transform="rotate(-8) translate(-60, -100)">
+      <rect width="140" height="188" rx="14" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="1.5"/>
+      <text x="16" y="36" font-size="22" font-weight="500" fill="#B4B2A9" font-family="Georgia, serif">3</text>
+      <text x="16" y="58" font-size="18" fill="#B4B2A9" font-family="Georgia, serif">♥</text>
+      <text x="70" y="108" font-size="48" text-anchor="middle" fill="#D3D1C7" font-family="Georgia, serif">3</text>
+    </g>
+
+    <!-- Front card (purple, rotated right) -->
+    <g transform="rotate(5) translate(-60, -100)">
+      <rect width="140" height="188" rx="14" fill="#534AB7" stroke="#3C3489" stroke-width="1.5"/>
+      <text x="16" y="36" font-size="22" font-weight="500" fill="#CECBF6" font-family="Georgia, serif">8</text>
+      <text x="16" y="58" font-size="18" fill="#CECBF6" font-family="Georgia, serif">♠</text>
+      <text x="70" y="108" font-size="56" text-anchor="middle" fill="#EEEDFE" font-family="Georgia, serif">8</text>
+    </g>
+
+    <!-- Sprint ring -->
+    <circle cx="110" cy="-90" r="46" fill="none" stroke="#534AB7" stroke-width="4"
+      stroke-dasharray="238 50" stroke-linecap="round"
+      marker-end="url(#arrow)"/>
+    <!-- Checkmark inside ring -->
+    <polyline points="93,-90 104,-78 128,-104" fill="none" stroke="#1D9E75" stroke-width="4"
+      stroke-linecap="round" stroke-linejoin="round"/>
+
+  </g>
+
+  <!-- Vertical divider -->
+  <line x1="520" y1="190" x2="520" y2="440" stroke="#D3D1C7" stroke-width="1"/>
+
+  <!-- Wordmark -->
+  <text x="556" y="348" dominant-baseline="middle" font-family="Georgia, 'Times New Roman', serif" font-size="88" letter-spacing="-1">
+    <tspan fill="#2C2C2A" font-weight="400">plan</tspan><tspan fill="#2C2C2A" font-weight="700">by</tspan><tspan fill="#534AB7" font-weight="700">poker</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="558" y="410" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22"
+    fill="#888780" letter-spacing="0.15em">PLANNING POKER FOR AGILE TEAMS</text>
+
+  <!-- Accent line -->
+  <line x1="558" y1="432" x2="780" y2="432" stroke="#534AB7" stroke-width="2" stroke-linecap="round"/>
+
+</svg>
