@@ -112,11 +112,10 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate, c
 
       {/* Stats row */}
       {numericVotes.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {[
-            { label: 'Average', value: avg !== null ? (Number.isInteger(avg) ? String(avg) : avg.toFixed(1)) : '—', cls: 'bg-indigo-50 border-indigo-100 text-indigo-700 text-indigo-500' },
-            { label: 'Min', value: minVote !== null ? String(minVote) : '—', cls: 'bg-blue-50 border-blue-100 text-blue-700 text-blue-500' },
-            { label: 'Max', value: maxVote !== null ? String(maxVote) : '—', cls: 'bg-rose-50 border-rose-100 text-rose-700 text-rose-500' },
+            { label: 'Lowest', value: minVote !== null ? String(minVote) : '—', cls: 'bg-blue-50 border-blue-100 text-blue-700 text-blue-500' },
+            { label: 'Highest', value: maxVote !== null ? String(maxVote) : '—', cls: 'bg-rose-50 border-rose-100 text-rose-700 text-rose-500' },
           ].map(({ label, value, cls }) => {
             const [bg, border, textVal, textLabel] = cls.split(' ');
             return (
