@@ -33,7 +33,7 @@ export interface Story {
 
 export type DeckType = 'fibonacci' | 'tshirt' | 'powers2' | 'risk';
 
-export const FREE_VOTER_LIMIT = 7;
+export const FREE_VOTER_LIMIT = 15;
 
 export const DECK_CARDS: Record<DeckType, string[]> = {
   fibonacci: ['0', '½', '1', '2', '3', '5', '8', '13', '21', '40', '100', '☕'],

@@ -247,9 +247,9 @@ io.on('connection', (socket) => {
         // Enforce 5-seat free plan limit for non-spectators
         if (!isSpectator && room.plan === 'free') {
           const votingCount = room.users.filter((u) => u.isConnected && !u.isSpectator).length;
-          if (votingCount >= 7) {
+          if (votingCount >= 15) {
             socket.emit('error', {
-              message: 'Room is at the 7-member free limit. Ask the facilitator to upgrade to Pro.',
+              message: 'Room is at the 15-member free limit. Ask the facilitator to upgrade to Pro.',
             });
             return;
           }
