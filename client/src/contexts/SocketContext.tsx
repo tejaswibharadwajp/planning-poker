@@ -16,9 +16,11 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 interface SocketContextValue {
   room: Room | null;
   userId: string | null;
+  roomPassword: string | null;
   error: string | null;
   connected: boolean;
   kicked: boolean;
+  roomClosed: boolean;
   reactions: Reaction[];
   startQuickVote: () => void;
   joinRoom: (params: {
@@ -27,6 +29,7 @@ interface SocketContextValue {
     userName: string;
     isSpectator?: boolean;
     deckType?: string;
+    password?: string;
   }) => void;
   upgradePlan: () => void;
   addStory: (title: string, description?: string) => void;
@@ -51,11 +54,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [roomPassword, setRoomPassword] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [kicked, setKicked] = useState(false);
+  const [roomClosed, setRoomClosed] = useState(false);
   const [reactions, setReactions] = useState<Reaction[]>([]);
-  const { getToken, userId: clerkUserId } = useAuth();
+  const { userId: clerkUserId } = useAuth();
   const { user } = useUser();
 
   useEffect(() => {
@@ -63,12 +68,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      randomizationFactor: 0.5,
-      timeout: 20000,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 5000,
     });
-    // Attach Clerk identity once available
     if (clerkUserId) {
       socket.auth = { clerkUserId };
     }
@@ -79,9 +81,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       const saved = sessionStorage.getItem('poker_session');
       if (saved) {
         try {
-          const { roomCode, userId: savedId, userName } = JSON.parse(saved);
+          const { roomCode, userId: savedId, userName, roomPassword: savedPwd } = JSON.parse(saved);
           if (roomCode && savedId && userName) {
             socket.emit('rejoin-room', { roomCode, userId: savedId, userName });
+            if (savedPwd) setRoomPassword(savedPwd);
           }
         } catch {
           sessionStorage.removeItem('poker_session');
@@ -91,22 +94,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     socket.on('disconnect', () => setConnected(false));
 
-    socket.on('room-joined', ({ room: r, userId: uid }: { room: Room; userId: string }) => {
+    socket.on('room-joined', ({ room: r, userId: uid, password: pwd }: { room: Room; userId: string; password?: string }) => {
       setRoom(r);
       setUserId(uid);
+      if (pwd) setRoomPassword(pwd);
       setError(null);
       const saved = sessionStorage.getItem('poker_session');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          sessionStorage.setItem(
-            'poker_session',
-            JSON.stringify({ ...parsed, userId: uid, roomCode: r.code })
-          );
-        } catch {
-          /* ignore */
-        }
-      }
+      try {
+        const parsed = saved ? JSON.parse(saved) : {};
+        sessionStorage.setItem(
+          'poker_session',
+          JSON.stringify({ ...parsed, userId: uid, roomCode: r.code, roomPassword: pwd ?? parsed.roomPassword })
+        );
+      } catch { /* ignore */ }
     });
 
     socket.on('room-updated', ({ room: r }: { room: Room }) => setRoom(r));
@@ -118,6 +118,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setRoom(null);
       setUserId(null);
       setKicked(true);
+    });
+
+    socket.on('room-closed', () => {
+      sessionStorage.removeItem('poker_session');
+      setRoom(null);
+      setUserId(null);
+      setRoomPassword(null);
+      setRoomClosed(true);
     });
 
     socket.on('reaction', (r: Omit<Reaction, 'x'>) => {
@@ -134,7 +142,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const joinRoom = useCallback(
-    (params: { roomName?: string; roomCode?: string; userName: string; isSpectator?: boolean; deckType?: string }) => {
+    (params: { roomName?: string; roomCode?: string; userName: string; isSpectator?: boolean; deckType?: string; password?: string }) => {
       sessionStorage.setItem(
         'poker_session',
         JSON.stringify({
@@ -162,9 +170,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   );
 
   const leaveRoom = useCallback(() => {
+    socketRef.current?.emit('leave-room');
     sessionStorage.removeItem('poker_session');
     setRoom(null);
     setUserId(null);
+    setRoomPassword(null);
     socketRef.current?.disconnect();
     setTimeout(() => socketRef.current?.connect(), 100);
   }, []);
@@ -254,9 +264,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       value={{
         room,
         userId,
+        roomPassword,
         error,
         connected,
         kicked,
+        roomClosed,
         reactions,
         startQuickVote,
         joinRoom,

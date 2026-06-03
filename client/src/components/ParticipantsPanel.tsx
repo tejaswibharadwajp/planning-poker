@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, WifiOff, Crown, VolumeX, Volume2, X, Pencil } from 'lucide-react';
+import { CheckCircle2, Clock, WifiOff, Crown, VolumeX, X, Pencil } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { User, Story, getAvatarColor, getInitials } from '../types';
 import clsx from 'clsx';
@@ -170,11 +170,7 @@ export default function ParticipantsPanel({
                       <div className="w-7 h-7 bg-emerald-100 rounded-lg flex items-center justify-center" title="Voted">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                       </div>
-                    ) : user.isMuted ? (
-                      <div className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center" title="Muted">
-                        <VolumeX className="w-3.5 h-3.5 text-red-400" />
-                      </div>
-                    ) : (
+                    ) : user.isMuted ? null : (
                       <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center" title="Waiting">
                         <Clock className="w-4 h-4 text-slate-400 animate-pulse" />
                       </div>
@@ -195,25 +191,30 @@ export default function ParticipantsPanel({
                 </div>
               )}
 
-              {/* Admin controls */}
-              {isAdmin && !isCurrentUser && user.isConnected && (
-                <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!user.isAdmin && !user.isSpectator && (
-                    <button
-                      onClick={() => onToggleMute(user.id)}
-                      title={user.isMuted ? 'Unmute' : 'Mute'}
-                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      {user.isMuted
-                        ? <Volume2 className="w-3.5 h-3.5" />
-                        : <VolumeX className="w-3.5 h-3.5" />}
-                    </button>
+              {/* Mute toggle — single icon, color shows state */}
+              {isAdmin && !isCurrentUser && user.isConnected && !user.isSpectator && !user.isAdmin && (
+                <button
+                  onClick={() => onToggleMute(user.id)}
+                  title={user.isMuted ? 'Unmute' : 'Mute'}
+                  className={clsx(
+                    'flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md transition-colors',
+                    user.isMuted
+                      ? 'bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600'
+                      : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600'
                   )}
+                >
+                  <VolumeX className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Promote + kick drawer — slides in on hover */}
+              {isAdmin && !isCurrentUser && user.isConnected && (
+                <div className="flex-shrink-0 overflow-hidden max-w-0 opacity-0 group-hover:max-w-[4rem] group-hover:opacity-100 transition-all duration-200 ease-out flex items-center gap-1">
                   {!user.isAdmin && (
                     <button
                       onClick={() => onPromote(user.id)}
                       title="Make facilitator"
-                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
+                      className="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
                     >
                       <Crown className="w-3.5 h-3.5" />
                     </button>
@@ -221,7 +222,7 @@ export default function ParticipantsPanel({
                   <button
                     onClick={() => onKick(user.id)}
                     title="Remove from room"
-                    className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                    className="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
