@@ -88,11 +88,10 @@ export default function ParticipantsPanel({
               className={clsx(
                 'group flex items-center gap-2 px-3 py-2.5 rounded-xl transition-colors',
                 isCurrentUser ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-slate-50',
-                !user.isConnected && 'opacity-40'
               )}
             >
               {/* Avatar */}
-              <div className="relative flex-shrink-0">
+              <div className={clsx('relative flex-shrink-0', !user.isConnected && 'opacity-40')}>
                 <div
                   className={clsx(
                     'w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold',
@@ -110,7 +109,7 @@ export default function ParticipantsPanel({
               </div>
 
               {/* Info */}
-              <div className="flex-1 min-w-0">
+              <div className={clsx('flex-1 min-w-0', !user.isConnected && 'opacity-40')}>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {isCurrentUser && editingName ? (
                     <input
@@ -207,7 +206,7 @@ export default function ParticipantsPanel({
                 </button>
               )}
 
-              {/* Promote + kick drawer — slides in on hover */}
+              {/* Promote + kick drawer — slides in on hover (connected users only) */}
               {isAdmin && !isCurrentUser && user.isConnected && (
                 <div className="flex-shrink-0 overflow-hidden max-w-0 opacity-0 group-hover:max-w-[4rem] group-hover:opacity-100 transition-all duration-200 ease-out flex items-center gap-1">
                   {!user.isAdmin && (
@@ -227,6 +226,17 @@ export default function ParticipantsPanel({
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
+              )}
+
+              {/* Remove disconnected user */}
+              {isAdmin && !isCurrentUser && !user.isConnected && (
+                <button
+                  onClick={() => onKick(user.id)}
+                  title="Remove disconnected user"
+                  className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 text-slate-400 hover:text-red-500"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
           );
