@@ -289,7 +289,7 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate, c
 
           <button
             onClick={onRevote}
-            className="w-full py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Revote
