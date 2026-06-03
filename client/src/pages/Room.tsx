@@ -56,6 +56,7 @@ export default function Room() {
     kickUser,
     toggleMute,
     sendReaction,
+    renameUser,
     leaveRoom,
     startQuickVote,
     upgradePlan,
@@ -162,8 +163,26 @@ export default function Room() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Reconnecting to room…</p>
+          {error ? (
+            <>
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-6 h-6 text-red-500" />
+              </div>
+              <p className="text-slate-700 font-semibold mb-1">Couldn't rejoin room</p>
+              <p className="text-slate-500 text-sm mb-5">{error}</p>
+              <button
+                onClick={() => { leaveRoom(); navigate('/'); }}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition-colors"
+              >
+                Go Home
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-slate-600 font-medium">Reconnecting to room…</p>
+            </>
+          )}
         </div>
       </div>
     );
@@ -619,6 +638,7 @@ export default function Room() {
             onPromote={promoteUser}
             onKick={kickUser}
             onToggleMute={toggleMute}
+            onRename={renameUser}
           />
         </div>
       </div>

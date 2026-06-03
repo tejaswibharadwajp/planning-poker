@@ -40,6 +40,7 @@ interface SocketContextValue {
   kickUser: (targetUserId: string) => void;
   toggleMute: (targetUserId: string) => void;
   sendReaction: (emoji: string) => void;
+  renameUser: (newName: string) => void;
   leaveRoom: () => void;
   clearError: () => void;
 }
@@ -61,8 +62,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      randomizationFactor: 0.5,
+      timeout: 20000,
     });
     // Attach Clerk identity once available
     if (clerkUserId) {
@@ -231,6 +235,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const renameUser = useCallback((newName: string) => {
+    const trimmed = newName.trim().slice(0, 32);
+    if (trimmed.length < 2) return;
+    socketRef.current?.emit('rename-user', { newName: trimmed });
+    try {
+      const saved = sessionStorage.getItem('poker_session');
+      if (saved) {
+        sessionStorage.setItem('poker_session', JSON.stringify({ ...JSON.parse(saved), userName: trimmed }));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
   return (
@@ -255,6 +271,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         kickUser,
         toggleMute,
         sendReaction,
+        renameUser,
         leaveRoom,
         clearError,
         upgradePlan,
