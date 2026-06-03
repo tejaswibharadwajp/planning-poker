@@ -1,4 +1,5 @@
-import { CheckCircle2, Clock, WifiOff, Crown, VolumeX, Volume2, X } from 'lucide-react';
+import { CheckCircle2, Clock, WifiOff, Crown, VolumeX, Volume2, X, Pencil } from 'lucide-react';
+import { useState, useRef } from 'react';
 import { User, Story, getAvatarColor, getInitials } from '../types';
 import clsx from 'clsx';
 
@@ -10,6 +11,7 @@ interface Props {
   onPromote: (userId: string) => void;
   onKick: (userId: string) => void;
   onToggleMute: (userId: string) => void;
+  onRename: (newName: string) => void;
 }
 
 export default function ParticipantsPanel({
@@ -20,7 +22,23 @@ export default function ParticipantsPanel({
   onPromote,
   onKick,
   onToggleMute,
+  onRename,
 }: Props) {
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = (currentName: string) => {
+    setNameInput(currentName);
+    setEditingName(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const commitEdit = () => {
+    const trimmed = nameInput.trim();
+    if (trimmed.length >= 2) onRename(trimmed);
+    setEditingName(false);
+  };
   const votingActive = activeStory?.status === 'voting';
   const revealed = activeStory?.status === 'revealed' || activeStory?.status === 'done';
 
@@ -94,11 +112,35 @@ export default function ParticipantsPanel({
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={clsx('text-sm font-medium truncate', isCurrentUser ? 'text-indigo-700' : 'text-slate-800')}>
-                    {user.name}
-                  </span>
-                  {isCurrentUser && (
+                  {isCurrentUser && editingName ? (
+                    <input
+                      ref={inputRef}
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      onBlur={commitEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+                        if (e.key === 'Escape') { setEditingName(false); }
+                      }}
+                      maxLength={32}
+                      className="text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-28"
+                    />
+                  ) : (
+                    <span className={clsx('text-sm font-medium truncate', isCurrentUser ? 'text-indigo-700' : 'text-slate-800')}>
+                      {user.name}
+                    </span>
+                  )}
+                  {isCurrentUser && !editingName && (
                     <span className="text-xs text-indigo-500 font-medium">(You)</span>
+                  )}
+                  {isCurrentUser && !editingName && (
+                    <button
+                      onClick={() => startEdit(user.name)}
+                      title="Edit name"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity w-4 h-4 flex items-center justify-center text-indigo-400 hover:text-indigo-600"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
                   )}
                   {user.isAdmin && (
                     <span title="Facilitator"><Crown className="w-3 h-3 text-amber-500 flex-shrink-0" /></span>

@@ -188,7 +188,9 @@ app.post('/api/feedback', feedbackLimiter, async (req, res) => {
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] },
-  maxHttpBufferSize: 16 * 1024, // 16 KB max payload per socket message
+  maxHttpBufferSize: 16 * 1024,
+  pingInterval: 25000,
+  pingTimeout: 60000,
 });
 
 // Per-socket event rate limiter: returns true if event should be dropped
@@ -545,6 +547,25 @@ io.on('connection', (socket) => {
     if (!target || target.id === user.id) return;
 
     target.isMuted = !target.isMuted;
+    io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
+  });
+
+  socket.on('rename-user', ({ newName }: { newName: string }) => {
+    if (limited('rename-user', 3, 30_000)) return; // max 3 per 30s
+    const room = getRoomByCode(socket.data.roomCode);
+    if (!room) return;
+    const user = room.users.find((u) => u.id === socket.data.userId);
+    if (!user) return;
+
+    const trimmed = String(newName).trim().slice(0, 32);
+    if (trimmed.length < 2) return;
+
+    user.name = trimmed;
+    for (const story of room.stories) {
+      if (story.votes[user.id]) {
+        story.votes[user.id].userName = trimmed;
+      }
+    }
     io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
   });
 

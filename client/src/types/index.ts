@@ -36,7 +36,7 @@ export type DeckType = 'fibonacci' | 'tshirt' | 'powers2' | 'risk';
 export const FREE_VOTER_LIMIT = 15;
 
 export const DECK_CARDS: Record<DeckType, string[]> = {
-  fibonacci: ['0', '½', '1', '2', '3', '5', '8', '13', '21', '40', '100', '☕'],
+  fibonacci: ['0', '1', '2', '3', '5', '8', '13', '21', '40', '100', '☕'],
   tshirt:    ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?'],
   powers2:   ['1', '2', '4', '8', '16', '32', '64', '?'],
   risk:      ['1', '2', '3', '4', '5'],
