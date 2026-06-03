@@ -18,6 +18,8 @@ import {
   Crown,
   MessageSquarePlus,
   Timer,
+  Lock,
+  EyeOff,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import { useUser } from '@clerk/clerk-react';
@@ -32,6 +34,30 @@ import FeedbackModal from '../components/FeedbackModal';
 import clsx from 'clsx';
 
 const REACTION_EMOJIS = ['👍', '🔥', '😬', '🤔', '🎉'];
+
+function PasswordPill({ password }: { password: string }) {
+  const [copied, setCopied] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(password);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="hidden sm:flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium">
+      <Lock className="w-3 h-3 text-amber-400 flex-shrink-0" />
+      <span className="text-slate-400 font-mono tracking-wide select-all">
+        {visible ? password : '••••••••'}
+      </span>
+      <button onClick={() => setVisible((v) => !v)} title={visible ? 'Hide' : 'Show'} className="text-slate-500 hover:text-slate-300 transition-colors ml-0.5">
+        <Eye className="w-3 h-3" />
+      </button>
+      <button onClick={copy} title="Copy password" className="text-slate-500 hover:text-slate-300 transition-colors">
+        {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+      </button>
+    </div>
+  );
+}
 
 export default function Room() {
   const navigate = useNavigate();
@@ -57,6 +83,8 @@ export default function Room() {
     toggleMute,
     sendReaction,
     renameUser,
+    roomPassword,
+    roomClosed,
     leaveRoom,
     startQuickVote,
     upgradePlan,
@@ -70,10 +98,12 @@ export default function Room() {
   const [writeBackToast, setWriteBackToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [elapsedSecs, setElapsedSecs] = useState(0);
 
-  // Direct URL join state — pre-fill from Clerk
+  // Direct URL join state — pre-fill from Clerk / URL params
   const [joinName, setJoinName] = useState(
     () => user?.fullName || user?.firstName || user?.emailAddresses[0]?.emailAddress?.split('@')[0] || ''
   );
+  const [joinPassword, setJoinPassword] = useState('');
+  const [showJoinPassword, setShowJoinPassword] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
 
   const handleSetEstimate = (storyId: string, estimate: string) => {
@@ -103,10 +133,14 @@ export default function Room() {
     }
   });
 
-  // Redirect when kicked
+  // Redirect when kicked or room closed
   useEffect(() => {
     if (kicked) navigate('/');
   }, [kicked, navigate]);
+
+  useEffect(() => {
+    if (roomClosed) navigate('/?roomClosed=1');
+  }, [roomClosed, navigate]);
 
   useEffect(() => {
     if (room || error) setJoinLoading(false);
@@ -216,7 +250,7 @@ export default function Room() {
                 if (!joinName.trim() || !code) return;
                 setJoinLoading(true);
                 clearError();
-                joinRoom({ userName: joinName.trim(), roomCode: code });
+                joinRoom({ userName: joinName.trim(), roomCode: code, password: joinPassword.trim() || undefined });
               }}
               className="space-y-5"
             >
@@ -234,6 +268,28 @@ export default function Room() {
                   required
                   autoFocus
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Room password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showJoinPassword ? 'text' : 'password'}
+                    value={joinPassword}
+                    onChange={(e) => setJoinPassword(e.target.value)}
+                    placeholder="Leave blank if room has no password"
+                    className="w-full px-4 py-3 pr-11 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder-slate-400 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowJoinPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showJoinPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"
@@ -290,7 +346,7 @@ export default function Room() {
   };
 
   const copyLink = async () => {
-    await navigator.clipboard.writeText(window.location.href);
+    await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}`);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
   };
@@ -367,6 +423,11 @@ export default function Room() {
             <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
           )}
         </button>
+
+        {/* Password indicator — facilitator only */}
+        {roomPassword && isAdmin && (
+          <PasswordPill password={roomPassword} />
+        )}
 
         {/* Share link */}
         <button

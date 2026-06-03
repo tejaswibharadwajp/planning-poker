@@ -51,6 +51,7 @@ interface Room {
   id: string;
   name: string;
   code: string;
+  password: string | null;
   users: User[];
   stories: Story[];
   activeStoryId: string | null;
@@ -189,8 +190,6 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] },
   maxHttpBufferSize: 16 * 1024,
-  pingInterval: 25000,
-  pingTimeout: 60000,
 });
 
 // Per-socket event rate limiter: returns true if event should be dropped
@@ -225,6 +224,7 @@ io.on('connection', (socket) => {
       isSpectator = false,
       clerkUserId,
       deckType = 'fibonacci',
+      password,
     }: {
       roomName?: string;
       roomCode?: string;
@@ -232,6 +232,7 @@ io.on('connection', (socket) => {
       isSpectator?: boolean;
       clerkUserId?: string;
       deckType?: string;
+      password?: string;
     }) => {
       let room: Room;
       const userId = uuidv4();
@@ -246,7 +247,12 @@ io.on('connection', (socket) => {
         }
         room = existing;
 
-        // Enforce 5-seat free plan limit for non-spectators
+        if (room.password && (!password || password.trim() !== room.password)) {
+          socket.emit('error', { message: 'Incorrect room password.' });
+          return;
+        }
+
+        // Enforce free plan limit for non-spectators
         if (!isSpectator && room.plan === 'free') {
           const votingCount = room.users.filter((u) => u.isConnected && !u.isSpectator).length;
           if (votingCount >= 15) {
@@ -276,6 +282,7 @@ io.on('connection', (socket) => {
           id: roomId,
           name: roomName?.trim() || `${userName}'s Room`,
           code,
+          password: password?.trim() || null,
           users: [
             {
               id: userId,
@@ -311,7 +318,7 @@ io.on('connection', (socket) => {
       socket.data.userId = userId;
       socket.data.roomCode = room.code;
 
-      socket.emit('room-joined', { room: sanitizeRoom(room), userId });
+      socket.emit('room-joined', { room: sanitizeRoom(room), userId, password: room.password });
       io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
     }
   );
@@ -569,6 +576,22 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
   });
 
+  socket.on('leave-room', () => {
+    const room = getRoomByCode(socket.data.roomCode);
+    if (!room) return;
+    const user = room.users.find((u) => u.id === socket.data.userId);
+    if (!user) return;
+
+    if (user.isAdmin) {
+      const otherAdmins = room.users.filter((u) => u.id !== user.id && u.isAdmin && u.isConnected);
+      if (otherAdmins.length === 0) {
+        socket.to(room.code).emit('room-closed');
+        rooms.delete(room.id);
+        return;
+      }
+    }
+  });
+
   socket.on('upgrade-plan', () => {
     const room = getRoomByCode(socket.data.roomCode);
     if (!room) return;
@@ -598,8 +621,13 @@ io.on('connection', (socket) => {
     const room = getRoomByCode(socket.data.roomCode);
     if (!room) return;
     const user = room.users.find((u) => u.id === socket.data.userId);
-    if (user) user.isConnected = false;
-    io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
+    // Guard: if user already reconnected (new socketId), don't clobber isConnected
+    if (user && user.socketId === socket.id) {
+      user.isConnected = false;
+      io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
+    } else {
+      return;
+    }
 
     if (room.users.filter((u) => u.isConnected).length === 0) {
       setTimeout(() => {

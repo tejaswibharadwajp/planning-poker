@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus, ArrowRight, Loader2, AlertCircle, Zap,
-  BarChart2, Shield, LogOut, Download, GitMerge, Eye, Star, MessageSquarePlus,
+  BarChart2, Shield, LogOut, Download, GitMerge, Eye, EyeOff, Star, MessageSquarePlus,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import { useUser, useClerk, SignInButton } from '@clerk/clerk-react';
@@ -56,6 +56,8 @@ function PokerCardPreview() {
 
 export default function Home() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const roomWasClosed = searchParams.get('roomClosed') === '1';
   const { joinRoom, error, room, clearError } = useSocket();
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
@@ -64,6 +66,11 @@ export default function Home() {
   const [roomName, setRoomName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [isSpectator, setIsSpectator] = useState(false);
+  const [joinPassword, setJoinPassword] = useState('');
+  const [showJoinPassword, setShowJoinPassword] = useState(false);
+  const [useRoomPassword, setUseRoomPassword] = useState(false);
+  const [createPassword, setCreatePassword] = useState('');
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deckType, setDeckType] = useState<DeckType>('fibonacci');
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -96,9 +103,15 @@ export default function Home() {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userName.trim()) return;
+    if (useRoomPassword && !createPassword.trim()) return;
     setLoading(true);
     clearError();
-    joinRoom({ userName: userName.trim(), roomName: roomName.trim() || undefined, deckType });
+    joinRoom({
+      userName: userName.trim(),
+      roomName: roomName.trim() || undefined,
+      deckType,
+      password: useRoomPassword ? createPassword.trim() : undefined,
+    });
   };
 
   const handleJoin = (e: React.FormEvent) => {
@@ -106,7 +119,7 @@ export default function Home() {
     if (!userName.trim() || !roomCode.trim()) return;
     setLoading(true);
     clearError();
-    joinRoom({ userName: userName.trim(), roomCode: roomCode.trim().toUpperCase(), isSpectator });
+    joinRoom({ userName: userName.trim(), roomCode: roomCode.trim().toUpperCase(), isSpectator, password: joinPassword.trim() || undefined });
   };
 
   const features = [
@@ -252,6 +265,12 @@ export default function Home() {
             </div>
 
             <div className="p-6 sm:p-8">
+              {roomWasClosed && (
+                <div className="flex items-center gap-2.5 text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 text-sm">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  The facilitator closed the room.
+                </div>
+              )}
               {error && (
                 <div className="flex items-center gap-2.5 text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-sm">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -306,9 +325,45 @@ export default function Home() {
                       ))}
                     </div>
                   </div>
+                  {/* Password protect toggle */}
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 cursor-pointer select-none p-3 rounded-xl hover:bg-slate-50 transition-colors">
+                      <div className="relative flex-shrink-0">
+                        <input type="checkbox" checked={useRoomPassword} onChange={(e) => setUseRoomPassword(e.target.checked)} className="sr-only" />
+                        <div className={`w-10 h-6 rounded-full transition-colors ${useRoomPassword ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${useRoomPassword ? 'translate-x-4' : ''}`} />
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold text-slate-700">Password protect this room</span>
+                        <p className="text-xs text-slate-400">Members must enter a password to join</p>
+                      </div>
+                    </label>
+                    {useRoomPassword && (
+                      <div className="relative">
+                        <input
+                          type={showCreatePassword ? 'text' : 'password'}
+                          value={createPassword}
+                          onChange={(e) => setCreatePassword(e.target.value)}
+                          placeholder="Set a room password"
+                          maxLength={64}
+                          className="w-full px-4 py-3 pr-11 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder-slate-400 text-sm"
+                          required={useRoomPassword}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCreatePassword((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                          tabIndex={-1}
+                        >
+                          {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="submit"
-                    disabled={loading || !userName.trim()}
+                    disabled={loading || !userName.trim() || (useRoomPassword && !createPassword.trim())}
                     className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-lg shadow-indigo-500/25"
                   >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -344,6 +399,28 @@ export default function Home() {
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder-slate-400 text-sm uppercase tracking-widest font-mono text-center text-lg"
                       required
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                      Room password <span className="text-slate-400 font-normal">(if required)</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showJoinPassword ? 'text' : 'password'}
+                        value={joinPassword}
+                        onChange={(e) => setJoinPassword(e.target.value)}
+                        placeholder="Leave blank if room has no password"
+                        className="w-full px-4 py-3 pr-11 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 placeholder-slate-400 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowJoinPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showJoinPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <label className="flex items-center gap-3 cursor-pointer select-none p-3 rounded-xl hover:bg-slate-50 transition-colors">
                     <div className="relative flex-shrink-0">
