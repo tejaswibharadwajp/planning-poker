@@ -111,19 +111,16 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate, c
       )}
 
       {/* Stats row */}
-      {numericVotes.length > 0 && (
+      {!isConsensus && numericVotes.length > 0 && minVote !== maxVote && (
         <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: 'Lowest', value: minVote !== null ? String(minVote) : '—', cls: 'bg-blue-50 border-blue-100 text-blue-700 text-blue-500' },
-            { label: 'Highest', value: maxVote !== null ? String(maxVote) : '—', cls: 'bg-rose-50 border-rose-100 text-rose-700 text-rose-500' },
-          ].map(({ label, value, cls }) => {
-            const [bg, border, textVal, textLabel] = cls.split(' ');
-            return (
-            <div key={label} className={`${bg} border ${border} rounded-xl px-4 py-3 text-center`}>
-              <p className={`text-2xl font-bold ${textVal} mb-0.5`}>{value}</p>
-              <p className={`text-xs ${textLabel} font-medium`}>{label}</p>
-            </div>
-          )})}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-center">
+            <p className="text-2xl font-bold text-blue-700 mb-0.5">{minVote !== null ? String(minVote) : '—'}</p>
+            <p className="text-xs text-blue-500 font-medium">Lowest</p>
+          </div>
+          <div className="bg-rose-50 border border-rose-100 rounded-xl px-4 py-3 text-center">
+            <p className="text-2xl font-bold text-rose-700 mb-0.5">{maxVote !== null ? String(maxVote) : '—'}</p>
+            <p className="text-xs text-rose-500 font-medium">Highest</p>
+          </div>
         </div>
       )}
 
@@ -206,8 +203,8 @@ export default function VoteResults({ story, isAdmin, onRevote, onSetEstimate, c
                 <div className="flex gap-1 flex-wrap pl-0">
                   {voters.map((name) => {
                     const vNum = parseVote(vote);
-                    const isLow = hasDivergence && vNum !== null && fi(vNum) <= minIdx + 1;
-                    const isHigh = hasDivergence && vNum !== null && fi(vNum) >= maxIdx - 1;
+                    const isLow = !isConsensus && minVote !== maxVote && vNum !== null && vNum === minVote;
+                    const isHigh = !isConsensus && minVote !== maxVote && vNum !== null && vNum === maxVote;
                     return (
                       <span
                         key={name}

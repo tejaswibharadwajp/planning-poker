@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Copy,
@@ -20,6 +20,7 @@ import {
   Timer,
   Lock,
   EyeOff,
+  ChevronDown,
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
 import { useUser } from '@clerk/clerk-react';
@@ -95,6 +96,7 @@ export default function Room() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
+  const votingCardsRef = useRef<HTMLDivElement>(null);
   const [writeBackToast, setWriteBackToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [elapsedSecs, setElapsedSecs] = useState(0);
 
@@ -346,7 +348,12 @@ export default function Room() {
   };
 
   const copyLink = async () => {
-    await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}`);
+    const url = `${window.location.origin}${window.location.pathname}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: `Join ${room.name}`, url }); } catch { /* cancelled */ }
+      return;
+    }
+    await navigator.clipboard.writeText(url);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
   };
@@ -433,17 +440,17 @@ export default function Room() {
         <button
           onClick={copyLink}
           title="Copy invite link"
-          className="hidden sm:flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
+          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
         >
           {linkCopied ? (
             <>
               <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400">Copied!</span>
+              <span className="hidden sm:block text-emerald-400">Copied!</span>
             </>
           ) : (
             <>
               <Share2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
-              <span className="text-slate-400 group-hover:text-white transition-colors">Share</span>
+              <span className="hidden sm:block text-slate-400 group-hover:text-white transition-colors">Share</span>
             </>
           )}
         </button>
@@ -470,30 +477,6 @@ export default function Room() {
         </button>
       </header>
 
-      {/* ── Mobile tab bar ── */}
-      <div className="lg:hidden flex border-b border-slate-200 bg-white">
-        {(
-          [
-            { key: 'backlog', label: 'Backlog', icon: BookOpen },
-            { key: 'voting', label: 'Voting', icon: Play },
-            { key: 'team', label: 'Team', icon: Users },
-          ] as const
-        ).map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setMobileTab(key)}
-            className={clsx(
-              'flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2',
-              mobileTab === key
-                ? 'text-indigo-600 border-indigo-600'
-                : 'text-slate-500 border-transparent hover:text-slate-700'
-            )}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-          </button>
-        ))}
-      </div>
 
       {/* ── Main layout ── */}
       <div className="flex-1 flex overflow-hidden">
@@ -522,7 +505,7 @@ export default function Room() {
             mobileTab === 'voting' ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'
           )}
         >
-          <div className="flex-1 p-6 max-w-3xl mx-auto w-full">
+          <div className="flex-1 p-6 pb-28 lg:pb-6 max-w-3xl mx-auto w-full">
             {!activeStory ? (
               /* No active story */
               <div className="h-full flex items-center justify-center">
@@ -603,7 +586,7 @@ export default function Room() {
 
                 {/* Voting cards */}
                 {votingPhase && (
-                  <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                  <div ref={votingCardsRef} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                     {isSpectator ? (
                       <div className="text-center py-6 text-slate-500 text-sm">
                         👁 Spectator mode — watching the vote
@@ -704,13 +687,56 @@ export default function Room() {
         </div>
       </div>
 
+      {/* ── Mobile bottom nav ── */}
+      <nav className="lg:hidden flex-shrink-0 flex border-t border-slate-200 bg-white shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
+        {(
+          [
+            { key: 'backlog', label: 'Backlog', icon: BookOpen, badge: false },
+            { key: 'voting', label: 'Voting', icon: Play, badge: votingPhase && !hasVoted && !isSpectator && !isMuted },
+            { key: 'team', label: 'Team', icon: Users, badge: false },
+          ] as const
+        ).map(({ key, label, icon: Icon, badge }) => (
+          <button
+            key={key}
+            onClick={() => setMobileTab(key)}
+            className={clsx(
+              'flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-semibold transition-colors relative',
+              mobileTab === key ? 'text-indigo-600' : 'text-slate-400 active:text-slate-600'
+            )}
+          >
+            {mobileTab === key && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-indigo-600 rounded-full" />
+            )}
+            <div className="relative">
+              <Icon className="w-5 h-5" />
+              {badge && (
+                <span className="absolute -top-1 -right-1.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+              )}
+            </div>
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Skip-to-vote floating button */}
+      {votingPhase && !hasVoted && !isSpectator && !isMuted && mobileTab === 'voting' && (
+        <button
+          className="lg:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-indigo-600 active:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-xl shadow-indigo-500/40"
+          onClick={() => votingCardsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        >
+          <Play className="w-3.5 h-3.5" />
+          Vote now
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
+      )}
+
       {/* Floating feedback pill */}
       <button
         onClick={() => setShowFeedback(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105 active:scale-95 transition-all duration-150"
+        className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105 active:scale-95 transition-all duration-150"
       >
         <MessageSquarePlus className="w-4 h-4 flex-shrink-0" />
-        Feedback
+        <span className="hidden sm:block">Feedback</span>
       </button>
 
       {showFeedback && (

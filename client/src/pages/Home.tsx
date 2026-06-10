@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus, ArrowRight, Loader2, AlertCircle, Zap,
@@ -76,6 +77,12 @@ export default function Home() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [showFeedback, setShowFeedback] = useState(false);
 
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const [featuresRef, featuresVisible] = useScrollReveal<HTMLDivElement>();
+  const [stepsRef, stepsVisible] = useScrollReveal<HTMLElement>();
+  const [testimonialsRef, testimonialsVisible] = useScrollReveal<HTMLElement>();
+
   useEffect(() => {
     if (user && !userName) {
       setUserName(
@@ -92,6 +99,14 @@ export default function Home() {
   useEffect(() => {
     if (error) setLoading(false);
   }, [error]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    const t = setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     fetch(`${SERVER_URL}/api/testimonials`)
@@ -183,26 +198,28 @@ export default function Home() {
       <main>
       {/* ── Hero ── */}
       <section className="flex flex-col items-center text-center px-4 pt-16 pb-10">
-        <div className="inline-flex items-center gap-2 bg-indigo-500/15 text-indigo-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-8 border border-indigo-500/25">
+        <div className="inline-flex items-center gap-2 bg-indigo-500/15 text-indigo-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-8 border border-indigo-500/25 anim-fade-down">
           <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
           Free · No account required · Real-time
         </div>
 
-        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-[1.05] tracking-tight max-w-4xl">
+        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-[1.05] tracking-tight max-w-4xl anim-fade-up anim-delay-100">
           Planning poker<br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400">
             built for dev teams
           </span>
         </h1>
 
-        <p className="text-slate-400 text-lg sm:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
+        <p className="text-slate-400 text-lg sm:text-xl max-w-2xl mx-auto mb-10 leading-relaxed anim-fade-up anim-delay-200">
           Fibonacci voting, live consensus detection, Jira & Azure DevOps integration — everything your sprint planning needs, nothing it doesn't.
         </p>
 
-        <PokerCardPreview />
+        <div className="anim-scale-up anim-delay-300">
+          <PokerCardPreview />
+        </div>
 
         {/* Stats */}
-        <div className="flex flex-wrap items-center justify-center gap-6 mt-10">
+        <div className="flex flex-wrap items-center justify-center gap-6 mt-10 anim-fade-up anim-delay-500">
           {[
             { value: '100%', label: 'Free to use' },
             { value: '<1s', label: 'Vote sync latency' },
@@ -222,7 +239,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
 
           {/* Form card */}
-          <div className="bg-white rounded-2xl shadow-2xl shadow-black/40 overflow-hidden order-1 lg:order-2">
+          <div ref={formRef} className="bg-white rounded-2xl shadow-2xl shadow-black/40 overflow-hidden order-1 lg:order-2 anim-scale-up anim-delay-200">
             {/* Sign-in nudge for guests */}
             {isLoaded && !user && (
               <div className="px-6 pt-5 pb-0">
@@ -450,7 +467,10 @@ export default function Home() {
           </div>
 
           {/* Features */}
-          <div className="order-2 lg:order-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div
+            ref={featuresRef}
+            className={`order-2 lg:order-1 grid grid-cols-1 sm:grid-cols-2 gap-3 transition-all duration-700 ease-out ${featuresVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+          >
             {features.map(({ icon: Icon, label, desc }) => (
               <div key={label} className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-white/8 hover:bg-white/8 transition-colors">
                 <div className="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -467,11 +487,15 @@ export default function Home() {
       </section>
 
       {/* ── How it works ── */}
-      <section className="px-4 py-12 max-w-4xl mx-auto w-full">
-        <h2 className="text-center text-2xl font-bold text-white mb-10">How it works</h2>
+      <section ref={stepsRef} className="px-4 py-12 max-w-4xl mx-auto w-full">
+        <h2 className={`text-center text-2xl font-bold text-white mb-10 transition-all duration-700 ease-out ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>How it works</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          {steps.map(({ n, title, desc }) => (
-            <div key={n} className="relative text-center p-6 rounded-2xl bg-white/5 border border-white/8">
+          {steps.map(({ n, title, desc }, i) => (
+            <div
+              key={n}
+              className={`relative text-center p-6 rounded-2xl bg-white/5 border border-white/8 transition-all duration-500 ease-out ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+              style={{ transitionDelay: stepsVisible ? `${100 + i * 100}ms` : '0ms' }}
+            >
               <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold text-lg flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/30">
                 {n}
               </div>
@@ -484,12 +508,16 @@ export default function Home() {
 
       {/* ── Testimonials ── */}
       {testimonials.length > 0 && (
-        <section className="px-4 py-12 max-w-5xl mx-auto w-full">
-          <h2 className="text-center text-2xl font-bold text-white mb-2">What teams are saying</h2>
-          <p className="text-center text-slate-500 text-sm mb-10">Real feedback from real sprint teams.</p>
+        <section ref={testimonialsRef} className="px-4 py-12 max-w-5xl mx-auto w-full">
+          <h2 className={`text-center text-2xl font-bold text-white mb-2 transition-all duration-700 ease-out ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>What teams are saying</h2>
+          <p className={`text-center text-slate-500 text-sm mb-10 transition-all duration-700 ease-out ${testimonialsVisible ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '100ms' }}>Real feedback from real sprint teams.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {testimonials.map((t) => (
-              <div key={t.id} className="p-5 rounded-2xl bg-white/5 border border-white/8 flex flex-col gap-3">
+            {testimonials.map((t, i) => (
+              <div
+                key={t.id}
+                className={`p-5 rounded-2xl bg-white/5 border border-white/8 flex flex-col gap-3 transition-all duration-500 ease-out ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
+                style={{ transitionDelay: testimonialsVisible ? `${150 + i * 60}ms` : '0ms' }}
+              >
                 <div className="flex gap-0.5">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star

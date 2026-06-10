@@ -13,6 +13,31 @@
 }
 
 @layer utilities {
+  /* ── Scroll / load animations ── */
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(22px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-down {
+    from { opacity: 0; transform: translateY(-14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-up {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .anim-fade-up   { opacity: 0; animation: fade-up   0.65s ease-out forwards; }
+  .anim-fade-down { opacity: 0; animation: fade-down 0.5s  ease-out forwards; }
+  .anim-scale-up  { opacity: 0; animation: scale-up  0.55s ease-out forwards; }
+
+  .anim-delay-100 { animation-delay: 100ms; }
+  .anim-delay-200 { animation-delay: 200ms; }
+  .anim-delay-300 { animation-delay: 300ms; }
+  .anim-delay-400 { animation-delay: 400ms; }
+  .anim-delay-500 { animation-delay: 500ms; }
+  .anim-delay-600 { animation-delay: 600ms; }
+
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: rgb(203 213 225) transparent;
