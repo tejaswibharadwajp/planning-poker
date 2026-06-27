@@ -24,6 +24,7 @@ interface SocketContextValue {
   reactions: Reaction[];
   chatMessages: ChatMessage[];
   sendChatMessage: (message: string, toUserId?: string) => void;
+  reactToChatMessage: (messageId: string, emoji: string) => void;
   startQuickVote: () => void;
   joinRoom: (params: {
     roomName?: string;
@@ -140,7 +141,26 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on('chat-message', (msg: ChatMessage) => {
-      setChatMessages((prev) => [...prev, msg]);
+      setChatMessages((prev) => [...prev, { ...msg, reactions: msg.reactions ?? {} }]);
+    });
+
+    socket.on('chat-reaction', ({ messageId, emoji, userId }: { messageId: string; emoji: string; userId: string }) => {
+      setChatMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId) return msg;
+          const existing = msg.reactions[emoji] ?? [];
+          const alreadyReacted = existing.includes(userId);
+          return {
+            ...msg,
+            reactions: {
+              ...msg.reactions,
+              [emoji]: alreadyReacted
+                ? existing.filter((id) => id !== userId)
+                : [...existing, userId],
+            },
+          };
+        })
+      );
     });
 
     return () => {
@@ -270,6 +290,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const reactToChatMessage = useCallback(
+    (messageId: string, emoji: string) =>
+      socketRef.current?.emit('react-to-chat', { messageId, emoji }),
+    []
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   return (
@@ -285,6 +311,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         reactions,
         chatMessages,
         sendChatMessage,
+        reactToChatMessage,
         startQuickVote,
         joinRoom,
         addStory,

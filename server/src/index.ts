@@ -602,6 +602,26 @@ io.on('connection', (socket) => {
   });
 
   socket.on(
+    'react-to-chat',
+    ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      if (limited('react-to-chat', 20, 10_000)) return;
+      const room = getRoomByCode(socket.data.roomCode);
+      if (!room) return;
+      const user = room.users.find((u) => u.id === socket.data.userId);
+      if (!user) return;
+
+      const ALLOWED = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+      if (!ALLOWED.includes(emoji)) return;
+
+      io.to(room.code).emit('chat-reaction', {
+        messageId,
+        emoji,
+        userId: user.id,
+      });
+    }
+  );
+
+  socket.on(
     'send-chat',
     ({ message, toUserId }: { message: string; toUserId?: string }) => {
       if (limited('send-chat', 10, 10_000)) return; // max 10 per 10s
@@ -623,6 +643,7 @@ io.on('connection', (socket) => {
         toUserId: target?.id,
         toName: target?.name,
         timestamp: Date.now(),
+        reactions: {} as Record<string, string[]>,
       };
 
       if (target) {

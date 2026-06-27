@@ -88,6 +88,7 @@ export default function Room() {
     renameUser,
     chatMessages,
     sendChatMessage,
+    reactToChatMessage,
     roomPassword,
     roomClosed,
     leaveRoom,
@@ -100,9 +101,12 @@ export default function Room() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showSharePopover, setShowSharePopover] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team' | 'chat'>('voting');
+  const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
+  const [chatOpen, setChatOpen] = useState(false);
   const [unreadChat, setUnreadChat] = useState(0);
   const prevChatLen = useRef(0);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+  const chatBtnRef = useRef<HTMLButtonElement>(null);
   const votingCardsRef = useRef<HTMLDivElement>(null);
   const shareButtonRef = useRef<HTMLButtonElement>(null);
   const [writeBackToast, setWriteBackToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -206,10 +210,21 @@ export default function Room() {
   useEffect(() => {
     const newCount = chatMessages.length - prevChatLen.current;
     prevChatLen.current = chatMessages.length;
-    if (newCount > 0 && mobileTab !== 'chat') {
-      setUnreadChat((n) => n + newCount);
-    }
-  }, [chatMessages.length]);
+    if (newCount > 0 && !chatOpen) setUnreadChat((n) => n + newCount);
+  }, [chatMessages.length, chatOpen]);
+
+  // Close chat on outside click (no overlay)
+  useEffect(() => {
+    if (!chatOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        !chatPanelRef.current?.contains(e.target as Node) &&
+        !chatBtnRef.current?.contains(e.target as Node)
+      ) setChatOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [chatOpen]);
 
   if (!room && hasValidSession) {
     return (
@@ -697,43 +712,23 @@ export default function Room() {
           </div>
         </div>
 
-        {/* Right sidebar — Participants + Chat */}
+        {/* Right sidebar — Participants */}
         <div
           className={clsx(
             'w-64 flex-shrink-0 border-l border-slate-100 overflow-hidden flex-col',
-            (mobileTab === 'team' || mobileTab === 'chat') ? 'flex flex-1' : 'hidden lg:flex'
+            mobileTab === 'team' ? 'flex flex-1' : 'hidden lg:flex'
           )}
         >
-          {/* Participants — flex-1 on desktop, full on mobile team tab */}
-          <div className={clsx(
-            'min-h-0 overflow-hidden flex flex-col',
-            mobileTab === 'chat' ? 'hidden lg:flex lg:flex-1' : 'flex-1 lg:flex-1'
-          )}>
-            <ParticipantsPanel
-              users={room.users}
-              currentUserId={userId}
-              activeStory={activeStory}
-              isAdmin={isAdmin}
-              onPromote={promoteUser}
-              onKick={kickUser}
-              onToggleMute={toggleMute}
-              onRename={renameUser}
-            />
-          </div>
-
-          {/* Chat panel — fixed height on desktop, full on mobile chat tab */}
-          <div className={clsx(
-            'flex-col overflow-hidden border-t border-slate-100',
-            'lg:flex lg:flex-none lg:h-72',
-            mobileTab === 'chat' ? 'flex flex-1' : 'hidden'
-          )}>
-            <ChatPanel
-              messages={chatMessages}
-              currentUserId={userId}
-              users={room.users}
-              onSend={sendChatMessage}
-            />
-          </div>
+          <ParticipantsPanel
+            users={room.users}
+            currentUserId={userId}
+            activeStory={activeStory}
+            isAdmin={isAdmin}
+            onPromote={promoteUser}
+            onKick={kickUser}
+            onToggleMute={toggleMute}
+            onRename={renameUser}
+          />
         </div>
       </div>
 
@@ -741,15 +736,14 @@ export default function Room() {
       <nav className="lg:hidden flex-shrink-0 flex border-t border-slate-200 bg-white shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
         {(
           [
-            { key: 'backlog', label: 'Backlog', icon: BookOpen, badge: false as boolean | number },
-            { key: 'voting', label: 'Voting', icon: Play, badge: (votingPhase && !hasVoted && !isSpectator && !isMuted) as boolean | number },
-            { key: 'team', label: 'Team', icon: Users, badge: false as boolean | number },
-            { key: 'chat', label: 'Chat', icon: MessageSquare, badge: unreadChat as boolean | number },
-          ]
+            { key: 'backlog', label: 'Backlog', icon: BookOpen, badge: false },
+            { key: 'voting', label: 'Voting', icon: Play, badge: votingPhase && !hasVoted && !isSpectator && !isMuted },
+            { key: 'team', label: 'Team', icon: Users, badge: false },
+          ] as const
         ).map(({ key, label, icon: Icon, badge }) => (
           <button
             key={key}
-            onClick={() => { setMobileTab(key as typeof mobileTab); if (key === 'chat') setUnreadChat(0); }}
+            onClick={() => setMobileTab(key)}
             className={clsx(
               'flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-semibold transition-colors relative',
               mobileTab === key ? 'text-indigo-600' : 'text-slate-400 active:text-slate-600'
@@ -760,13 +754,9 @@ export default function Room() {
             )}
             <div className="relative">
               <Icon className="w-5 h-5" />
-              {badge && typeof badge === 'number' && badge > 0 ? (
-                <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 px-0.5 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
-                  {badge > 9 ? '9+' : badge}
-                </span>
-              ) : badge ? (
+              {badge && (
                 <span className="absolute -top-1 -right-1.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-              ) : null}
+              )}
             </div>
             {label}
           </button>
@@ -784,6 +774,45 @@ export default function Room() {
           <ChevronDown className="w-3.5 h-3.5" />
         </button>
       )}
+
+      {/* Floating chat button + popover */}
+      <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-50 flex flex-col items-end gap-2">
+        {/* Popover panel */}
+        {chatOpen && (
+          <div
+            ref={chatPanelRef}
+            className="w-80 h-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+          >
+            <ChatPanel
+              messages={chatMessages}
+              currentUserId={userId}
+              users={room.users}
+              onSend={sendChatMessage}
+              onReact={reactToChatMessage}
+            />
+          </div>
+        )}
+
+        {/* Trigger button */}
+        <button
+          ref={chatBtnRef}
+          onClick={() => { setChatOpen((v) => !v); setUnreadChat(0); }}
+          className={clsx(
+            'relative flex items-center gap-2 px-4 py-2.5 rounded-full font-semibold text-sm shadow-lg transition-all duration-150 hover:scale-105 active:scale-95',
+            chatOpen
+              ? 'bg-slate-800 text-white shadow-slate-800/30'
+              : 'bg-slate-900 text-white shadow-slate-900/30 hover:bg-slate-800'
+          )}
+        >
+          <MessageSquare className="w-4 h-4 flex-shrink-0" />
+          <span>Chat</span>
+          {unreadChat > 0 && !chatOpen && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+              {unreadChat > 9 ? '9+' : unreadChat}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* Floating feedback pill */}
       <button

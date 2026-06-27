@@ -25,6 +25,7 @@ export interface ChatMessage {
   toUserId?: string;
   toName?: string;
   timestamp: number;
+  reactions: Record<string, string[]>; // emoji → [userId, ...]
 }
 
 export interface StoryVote {
