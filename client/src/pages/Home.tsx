@@ -469,7 +469,7 @@ export default function Home() {
           {/* Features */}
           <div
             ref={featuresRef}
-            className={`order-2 lg:order-1 grid grid-cols-1 sm:grid-cols-2 gap-3 transition-all duration-700 ease-out ${featuresVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            className={`order-2 lg:order-1 grid grid-cols-1 sm:grid-cols-2 gap-3 transition-all duration-1000 ease-out ${featuresVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
           >
             {features.map(({ icon: Icon, label, desc }) => (
               <div key={label} className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-white/8 hover:bg-white/8 transition-colors">
@@ -488,12 +488,12 @@ export default function Home() {
 
       {/* ── How it works ── */}
       <section ref={stepsRef} className="px-4 py-12 max-w-4xl mx-auto w-full">
-        <h2 className={`text-center text-2xl font-bold text-white mb-10 transition-all duration-700 ease-out ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>How it works</h2>
+        <h2 className={`text-center text-2xl font-bold text-white mb-10 transition-all duration-1000 ease-out ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>How it works</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {steps.map(({ n, title, desc }, i) => (
             <div
               key={n}
-              className={`relative text-center p-6 rounded-2xl bg-white/5 border border-white/8 transition-all duration-500 ease-out ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+              className={`relative text-center p-6 rounded-2xl bg-white/5 border border-white/8 transition-all duration-700 ease-out ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
               style={{ transitionDelay: stepsVisible ? `${100 + i * 100}ms` : '0ms' }}
             >
               <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold text-lg flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/30">
@@ -509,13 +509,13 @@ export default function Home() {
       {/* ── Testimonials ── */}
       {testimonials.length > 0 && (
         <section ref={testimonialsRef} className="px-4 py-12 max-w-5xl mx-auto w-full">
-          <h2 className={`text-center text-2xl font-bold text-white mb-2 transition-all duration-700 ease-out ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>What teams are saying</h2>
-          <p className={`text-center text-slate-500 text-sm mb-10 transition-all duration-700 ease-out ${testimonialsVisible ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '100ms' }}>Real feedback from real sprint teams.</p>
+          <h2 className={`text-center text-2xl font-bold text-white mb-2 transition-all duration-1000 ease-out ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>What teams are saying</h2>
+          <p className={`text-center text-slate-500 text-sm mb-10 transition-all duration-1000 ease-out ${testimonialsVisible ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '100ms' }}>Real feedback from real sprint teams.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {testimonials.map((t, i) => (
               <div
                 key={t.id}
-                className={`p-5 rounded-2xl bg-white/5 border border-white/8 flex flex-col gap-3 transition-all duration-500 ease-out ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
+                className={`p-5 rounded-2xl bg-white/5 border border-white/8 flex flex-col gap-3 transition-all duration-700 ease-out ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
                 style={{ transitionDelay: testimonialsVisible ? `${150 + i * 60}ms` : '0ms' }}
               >
                 <div className="flex gap-0.5">

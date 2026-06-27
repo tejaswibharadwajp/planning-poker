@@ -775,44 +775,48 @@ export default function Room() {
         </button>
       )}
 
-      {/* Floating chat button + popover */}
-      <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-50 flex flex-col items-end gap-2">
-        {/* Popover panel */}
-        {chatOpen && (
-          <div
-            ref={chatPanelRef}
-            className="w-80 h-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
-          >
-            <ChatPanel
-              messages={chatMessages}
-              currentUserId={userId}
-              users={room.users}
-              onSend={sendChatMessage}
-              onReact={reactToChatMessage}
-            />
-          </div>
-        )}
-
-        {/* Trigger button */}
-        <button
-          ref={chatBtnRef}
-          onClick={() => { setChatOpen((v) => !v); setUnreadChat(0); }}
+      {/* Floating chat popover */}
+      {chatOpen && (
+        <div
+          ref={chatPanelRef}
           className={clsx(
-            'relative flex items-center gap-2 px-4 py-2.5 rounded-full font-semibold text-sm shadow-lg transition-all duration-150 hover:scale-105 active:scale-95',
-            chatOpen
-              ? 'bg-slate-800 text-white shadow-slate-800/30'
-              : 'bg-slate-900 text-white shadow-slate-900/30 hover:bg-slate-800'
+            'fixed z-50 bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden',
+            // Mobile: full-width panel above both buttons
+            'inset-x-3 bottom-[13rem] max-h-[60vh] rounded-2xl',
+            // Desktop: anchored to bottom-right above button
+            'lg:inset-x-auto lg:right-6 lg:bottom-20 lg:w-80 lg:h-[420px] lg:max-h-none'
           )}
         >
-          <MessageSquare className="w-4 h-4 flex-shrink-0" />
-          <span>Chat</span>
-          {unreadChat > 0 && !chatOpen && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {unreadChat > 9 ? '9+' : unreadChat}
-            </span>
-          )}
-        </button>
-      </div>
+          <ChatPanel
+            messages={chatMessages}
+            currentUserId={userId}
+            users={room.users}
+            onSend={sendChatMessage}
+            onReact={reactToChatMessage}
+          />
+        </div>
+      )}
+
+      {/* Floating chat trigger button */}
+      <button
+        ref={chatBtnRef}
+        onClick={() => { setChatOpen((v) => !v); setUnreadChat(0); }}
+        className={clsx(
+          'fixed bottom-[8.5rem] right-4 lg:bottom-6 lg:right-6 z-50',
+          'inline-flex items-center justify-center gap-2 w-28 py-2.5 rounded-full font-semibold text-sm shadow-lg transition-all duration-150 hover:scale-105 active:scale-95',
+          chatOpen
+            ? 'bg-slate-800 text-white shadow-slate-800/30'
+            : 'bg-slate-900 text-white shadow-slate-900/30 hover:bg-slate-800'
+        )}
+      >
+        <MessageSquare className="w-4 h-4 flex-shrink-0" />
+        <span>Chat</span>
+        {unreadChat > 0 && !chatOpen && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+            {unreadChat > 9 ? '9+' : unreadChat}
+          </span>
+        )}
+      </button>
 
       {/* Floating feedback pill */}
       <button
