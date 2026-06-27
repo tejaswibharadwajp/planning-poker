@@ -17,6 +17,17 @@ export interface Reaction {
   x: number;
 }
 
+export interface ChatMessage {
+  id: string;
+  fromUserId: string;
+  fromName: string;
+  message: string;
+  toUserId?: string;
+  toName?: string;
+  timestamp: number;
+  reactions: Record<string, string[]>; // emoji → [userId, ...]
+}
+
 export interface StoryVote {
   vote: string;
   userName: string;

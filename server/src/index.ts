@@ -601,6 +601,63 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('room-updated', { room: sanitizeRoom(room) });
   });
 
+  socket.on(
+    'react-to-chat',
+    ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      if (limited('react-to-chat', 20, 10_000)) return;
+      const room = getRoomByCode(socket.data.roomCode);
+      if (!room) return;
+      const user = room.users.find((u) => u.id === socket.data.userId);
+      if (!user) return;
+
+      const ALLOWED = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+      if (!ALLOWED.includes(emoji)) return;
+
+      io.to(room.code).emit('chat-reaction', {
+        messageId,
+        emoji,
+        userId: user.id,
+      });
+    }
+  );
+
+  socket.on(
+    'send-chat',
+    ({ message, toUserId }: { message: string; toUserId?: string }) => {
+      if (limited('send-chat', 10, 10_000)) return; // max 10 per 10s
+      const room = getRoomByCode(socket.data.roomCode);
+      if (!room) return;
+      const user = room.users.find((u) => u.id === socket.data.userId);
+      if (!user) return;
+
+      const trimmed = String(message).trim().slice(0, 500);
+      if (!trimmed) return;
+
+      const target = toUserId ? room.users.find((u) => u.id === toUserId) : undefined;
+
+      const payload = {
+        id: uuidv4(),
+        fromUserId: user.id,
+        fromName: user.name,
+        message: trimmed,
+        toUserId: target?.id,
+        toName: target?.name,
+        timestamp: Date.now(),
+        reactions: {} as Record<string, string[]>,
+      };
+
+      if (target) {
+        // Private: send only to sender and target
+        socket.emit('chat-message', payload);
+        if (target.socketId !== socket.id) {
+          io.to(target.socketId).emit('chat-message', payload);
+        }
+      } else {
+        io.to(room.code).emit('chat-message', payload);
+      }
+    }
+  );
+
   socket.on('send-reaction', ({ emoji }: { emoji: string }) => {
     if (limited('send-reaction', 5, 3_000)) return; // max 5 per 3s
     const room = getRoomByCode(socket.data.roomCode);

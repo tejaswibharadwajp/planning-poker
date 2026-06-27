@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth, useUser } from '@clerk/clerk-react';
-import { Room, Reaction } from '../types';
+import { Room, Reaction, ChatMessage } from '../types';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
@@ -22,6 +22,9 @@ interface SocketContextValue {
   kicked: boolean;
   roomClosed: boolean;
   reactions: Reaction[];
+  chatMessages: ChatMessage[];
+  sendChatMessage: (message: string, toUserId?: string) => void;
+  reactToChatMessage: (messageId: string, emoji: string) => void;
   startQuickVote: () => void;
   joinRoom: (params: {
     roomName?: string;
@@ -60,6 +63,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [kicked, setKicked] = useState(false);
   const [roomClosed, setRoomClosed] = useState(false);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const { userId: clerkUserId } = useAuth();
   const { user } = useUser();
 
@@ -134,6 +138,29 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setTimeout(() => {
         setReactions((prev) => prev.filter((rx) => rx.id !== reaction.id));
       }, 3000);
+    });
+
+    socket.on('chat-message', (msg: ChatMessage) => {
+      setChatMessages((prev) => [...prev, { ...msg, reactions: msg.reactions ?? {} }]);
+    });
+
+    socket.on('chat-reaction', ({ messageId, emoji, userId }: { messageId: string; emoji: string; userId: string }) => {
+      setChatMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId) return msg;
+          const existing = msg.reactions[emoji] ?? [];
+          const alreadyReacted = existing.includes(userId);
+          return {
+            ...msg,
+            reactions: {
+              ...msg.reactions,
+              [emoji]: alreadyReacted
+                ? existing.filter((id) => id !== userId)
+                : [...existing, userId],
+            },
+          };
+        })
+      );
     });
 
     return () => {
@@ -257,6 +284,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   }, []);
 
+  const sendChatMessage = useCallback(
+    (message: string, toUserId?: string) =>
+      socketRef.current?.emit('send-chat', { message, toUserId }),
+    []
+  );
+
+  const reactToChatMessage = useCallback(
+    (messageId: string, emoji: string) =>
+      socketRef.current?.emit('react-to-chat', { messageId, emoji }),
+    []
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   return (
@@ -270,6 +309,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         kicked,
         roomClosed,
         reactions,
+        chatMessages,
+        sendChatMessage,
+        reactToChatMessage,
         startQuickVote,
         joinRoom,
         addStory,

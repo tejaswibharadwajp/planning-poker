@@ -17,6 +17,7 @@ import {
   VolumeX,
   Crown,
   MessageSquarePlus,
+  MessageSquare,
   Timer,
   Lock,
   EyeOff,
@@ -30,6 +31,7 @@ import { DECK_CARDS, FREE_VOTER_LIMIT } from '../types';
 import StoryPanel from '../components/StoryPanel';
 import VotingCards from '../components/VotingCards';
 import ParticipantsPanel from '../components/ParticipantsPanel';
+import ChatPanel from '../components/ChatPanel';
 import VoteResults from '../components/VoteResults';
 import FeedbackModal from '../components/FeedbackModal';
 import clsx from 'clsx';
@@ -84,6 +86,9 @@ export default function Room() {
     toggleMute,
     sendReaction,
     renameUser,
+    chatMessages,
+    sendChatMessage,
+    reactToChatMessage,
     roomPassword,
     roomClosed,
     leaveRoom,
@@ -95,8 +100,15 @@ export default function Room() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showSharePopover, setShowSharePopover] = useState(false);
   const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unreadChat, setUnreadChat] = useState(0);
+  const prevChatLen = useRef(0);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+  const chatBtnRef = useRef<HTMLButtonElement>(null);
   const votingCardsRef = useRef<HTMLDivElement>(null);
+  const shareButtonRef = useRef<HTMLButtonElement>(null);
   const [writeBackToast, setWriteBackToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [elapsedSecs, setElapsedSecs] = useState(0);
 
@@ -194,6 +206,25 @@ export default function Room() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [room, userId, submitVote, revealVotes, resetVotes]);
+
+  useEffect(() => {
+    const newCount = chatMessages.length - prevChatLen.current;
+    prevChatLen.current = chatMessages.length;
+    if (newCount > 0 && !chatOpen) setUnreadChat((n) => n + newCount);
+  }, [chatMessages.length, chatOpen]);
+
+  // Close chat on outside click (no overlay)
+  useEffect(() => {
+    if (!chatOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        !chatPanelRef.current?.contains(e.target as Node) &&
+        !chatBtnRef.current?.contains(e.target as Node)
+      ) setChatOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [chatOpen]);
 
   if (!room && hasValidSession) {
     return (
@@ -347,15 +378,12 @@ export default function Room() {
     setTimeout(() => setCodeCopied(false), 2000);
   };
 
+  const roomUrl = `${window.location.origin}${window.location.pathname}`;
+
   const copyLink = async () => {
-    const url = `${window.location.origin}${window.location.pathname}`;
-    if (navigator.share) {
-      try { await navigator.share({ title: `Join ${room.name}`, url }); } catch { /* cancelled */ }
-      return;
-    }
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(roomUrl);
     setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
+    setTimeout(() => { setLinkCopied(false); setShowSharePopover(false); }, 2000);
   };
 
   const handleLeave = () => {
@@ -437,23 +465,40 @@ export default function Room() {
         )}
 
         {/* Share link */}
-        <button
-          onClick={copyLink}
-          title="Copy invite link"
-          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
-        >
-          {linkCopied ? (
+        <div className="relative">
+          <button
+            ref={shareButtonRef}
+            onClick={() => setShowSharePopover((v) => !v)}
+            title="Share invite link"
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
+          >
+            <Share2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+            <span className="hidden sm:block text-slate-400 group-hover:text-white transition-colors">Share</span>
+          </button>
+
+          {showSharePopover && (
             <>
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:block text-emerald-400">Copied!</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
-              <span className="hidden sm:block text-slate-400 group-hover:text-white transition-colors">Share</span>
+              {/* Backdrop to close on outside click */}
+              <div className="fixed inset-0 z-40" onClick={() => setShowSharePopover(false)} />
+              <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-500 px-1">Invite link</p>
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  <span className="flex-1 text-xs text-slate-600 truncate font-mono">{roomUrl}</span>
+                </div>
+                <button
+                  onClick={copyLink}
+                  className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+                >
+                  {linkCopied ? (
+                    <><Check className="w-3.5 h-3.5" /> Copied!</>
+                  ) : (
+                    <><Copy className="w-3.5 h-3.5" /> Copy link</>
+                  )}
+                </button>
+              </div>
             </>
           )}
-        </button>
+        </div>
 
         {/* Connection status */}
         <div className={clsx('hidden sm:flex items-center gap-1.5 text-xs font-medium', connected ? 'text-emerald-400' : 'text-red-400')}>
@@ -670,8 +715,8 @@ export default function Room() {
         {/* Right sidebar — Participants */}
         <div
           className={clsx(
-            'w-64 flex-shrink-0 border-l border-slate-100 overflow-hidden',
-            mobileTab === 'team' ? 'flex flex-col flex-1' : 'hidden lg:flex lg:flex-col'
+            'w-64 flex-shrink-0 border-l border-slate-100 overflow-hidden flex-col',
+            mobileTab === 'team' ? 'flex flex-1' : 'hidden lg:flex'
           )}
         >
           <ParticipantsPanel
@@ -730,10 +775,49 @@ export default function Room() {
         </button>
       )}
 
+      {/* Floating chat button + popover */}
+      <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-50 flex flex-col items-end gap-2">
+        {/* Popover panel */}
+        {chatOpen && (
+          <div
+            ref={chatPanelRef}
+            className="w-80 h-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+          >
+            <ChatPanel
+              messages={chatMessages}
+              currentUserId={userId}
+              users={room.users}
+              onSend={sendChatMessage}
+              onReact={reactToChatMessage}
+            />
+          </div>
+        )}
+
+        {/* Trigger button */}
+        <button
+          ref={chatBtnRef}
+          onClick={() => { setChatOpen((v) => !v); setUnreadChat(0); }}
+          className={clsx(
+            'relative flex items-center gap-2 px-4 py-2.5 rounded-full font-semibold text-sm shadow-lg transition-all duration-150 hover:scale-105 active:scale-95',
+            chatOpen
+              ? 'bg-slate-800 text-white shadow-slate-800/30'
+              : 'bg-slate-900 text-white shadow-slate-900/30 hover:bg-slate-800'
+          )}
+        >
+          <MessageSquare className="w-4 h-4 flex-shrink-0" />
+          <span>Chat</span>
+          {unreadChat > 0 && !chatOpen && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+              {unreadChat > 9 ? '9+' : unreadChat}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Floating feedback pill */}
       <button
         onClick={() => setShowFeedback(true)}
-        className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105 active:scale-95 transition-all duration-150"
+        className="fixed bottom-20 lg:bottom-6 right-4 lg:right-auto lg:left-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105 active:scale-95 transition-all duration-150"
       >
         <MessageSquarePlus className="w-4 h-4 flex-shrink-0" />
         <span className="hidden sm:block">Feedback</span>
