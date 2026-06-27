@@ -17,6 +17,7 @@ import {
   VolumeX,
   Crown,
   MessageSquarePlus,
+  MessageSquare,
   Timer,
   Lock,
   EyeOff,
@@ -30,6 +31,7 @@ import { DECK_CARDS, FREE_VOTER_LIMIT } from '../types';
 import StoryPanel from '../components/StoryPanel';
 import VotingCards from '../components/VotingCards';
 import ParticipantsPanel from '../components/ParticipantsPanel';
+import ChatPanel from '../components/ChatPanel';
 import VoteResults from '../components/VoteResults';
 import FeedbackModal from '../components/FeedbackModal';
 import clsx from 'clsx';
@@ -84,6 +86,8 @@ export default function Room() {
     toggleMute,
     sendReaction,
     renameUser,
+    chatMessages,
+    sendChatMessage,
     roomPassword,
     roomClosed,
     leaveRoom,
@@ -95,8 +99,12 @@ export default function Room() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team'>('voting');
+  const [showSharePopover, setShowSharePopover] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'backlog' | 'voting' | 'team' | 'chat'>('voting');
+  const [unreadChat, setUnreadChat] = useState(0);
+  const prevChatLen = useRef(0);
   const votingCardsRef = useRef<HTMLDivElement>(null);
+  const shareButtonRef = useRef<HTMLButtonElement>(null);
   const [writeBackToast, setWriteBackToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [elapsedSecs, setElapsedSecs] = useState(0);
 
@@ -194,6 +202,14 @@ export default function Room() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [room, userId, submitVote, revealVotes, resetVotes]);
+
+  useEffect(() => {
+    const newCount = chatMessages.length - prevChatLen.current;
+    prevChatLen.current = chatMessages.length;
+    if (newCount > 0 && mobileTab !== 'chat') {
+      setUnreadChat((n) => n + newCount);
+    }
+  }, [chatMessages.length]);
 
   if (!room && hasValidSession) {
     return (
@@ -347,15 +363,12 @@ export default function Room() {
     setTimeout(() => setCodeCopied(false), 2000);
   };
 
+  const roomUrl = `${window.location.origin}${window.location.pathname}`;
+
   const copyLink = async () => {
-    const url = `${window.location.origin}${window.location.pathname}`;
-    if (navigator.share) {
-      try { await navigator.share({ title: `Join ${room.name}`, url }); } catch { /* cancelled */ }
-      return;
-    }
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(roomUrl);
     setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
+    setTimeout(() => { setLinkCopied(false); setShowSharePopover(false); }, 2000);
   };
 
   const handleLeave = () => {
@@ -437,23 +450,40 @@ export default function Room() {
         )}
 
         {/* Share link */}
-        <button
-          onClick={copyLink}
-          title="Copy invite link"
-          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
-        >
-          {linkCopied ? (
+        <div className="relative">
+          <button
+            ref={shareButtonRef}
+            onClick={() => setShowSharePopover((v) => !v)}
+            title="Share invite link"
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium group"
+          >
+            <Share2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+            <span className="hidden sm:block text-slate-400 group-hover:text-white transition-colors">Share</span>
+          </button>
+
+          {showSharePopover && (
             <>
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:block text-emerald-400">Copied!</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
-              <span className="hidden sm:block text-slate-400 group-hover:text-white transition-colors">Share</span>
+              {/* Backdrop to close on outside click */}
+              <div className="fixed inset-0 z-40" onClick={() => setShowSharePopover(false)} />
+              <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-500 px-1">Invite link</p>
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  <span className="flex-1 text-xs text-slate-600 truncate font-mono">{roomUrl}</span>
+                </div>
+                <button
+                  onClick={copyLink}
+                  className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+                >
+                  {linkCopied ? (
+                    <><Check className="w-3.5 h-3.5" /> Copied!</>
+                  ) : (
+                    <><Copy className="w-3.5 h-3.5" /> Copy link</>
+                  )}
+                </button>
+              </div>
             </>
           )}
-        </button>
+        </div>
 
         {/* Connection status */}
         <div className={clsx('hidden sm:flex items-center gap-1.5 text-xs font-medium', connected ? 'text-emerald-400' : 'text-red-400')}>
@@ -667,23 +697,43 @@ export default function Room() {
           </div>
         </div>
 
-        {/* Right sidebar — Participants */}
+        {/* Right sidebar — Participants + Chat */}
         <div
           className={clsx(
-            'w-64 flex-shrink-0 border-l border-slate-100 overflow-hidden',
-            mobileTab === 'team' ? 'flex flex-col flex-1' : 'hidden lg:flex lg:flex-col'
+            'w-64 flex-shrink-0 border-l border-slate-100 overflow-hidden flex-col',
+            (mobileTab === 'team' || mobileTab === 'chat') ? 'flex flex-1' : 'hidden lg:flex'
           )}
         >
-          <ParticipantsPanel
-            users={room.users}
-            currentUserId={userId}
-            activeStory={activeStory}
-            isAdmin={isAdmin}
-            onPromote={promoteUser}
-            onKick={kickUser}
-            onToggleMute={toggleMute}
-            onRename={renameUser}
-          />
+          {/* Participants — flex-1 on desktop, full on mobile team tab */}
+          <div className={clsx(
+            'min-h-0 overflow-hidden flex flex-col',
+            mobileTab === 'chat' ? 'hidden lg:flex lg:flex-1' : 'flex-1 lg:flex-1'
+          )}>
+            <ParticipantsPanel
+              users={room.users}
+              currentUserId={userId}
+              activeStory={activeStory}
+              isAdmin={isAdmin}
+              onPromote={promoteUser}
+              onKick={kickUser}
+              onToggleMute={toggleMute}
+              onRename={renameUser}
+            />
+          </div>
+
+          {/* Chat panel — fixed height on desktop, full on mobile chat tab */}
+          <div className={clsx(
+            'flex-col overflow-hidden border-t border-slate-100',
+            'lg:flex lg:flex-none lg:h-72',
+            mobileTab === 'chat' ? 'flex flex-1' : 'hidden'
+          )}>
+            <ChatPanel
+              messages={chatMessages}
+              currentUserId={userId}
+              users={room.users}
+              onSend={sendChatMessage}
+            />
+          </div>
         </div>
       </div>
 
@@ -691,14 +741,15 @@ export default function Room() {
       <nav className="lg:hidden flex-shrink-0 flex border-t border-slate-200 bg-white shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
         {(
           [
-            { key: 'backlog', label: 'Backlog', icon: BookOpen, badge: false },
-            { key: 'voting', label: 'Voting', icon: Play, badge: votingPhase && !hasVoted && !isSpectator && !isMuted },
-            { key: 'team', label: 'Team', icon: Users, badge: false },
-          ] as const
+            { key: 'backlog', label: 'Backlog', icon: BookOpen, badge: false as boolean | number },
+            { key: 'voting', label: 'Voting', icon: Play, badge: (votingPhase && !hasVoted && !isSpectator && !isMuted) as boolean | number },
+            { key: 'team', label: 'Team', icon: Users, badge: false as boolean | number },
+            { key: 'chat', label: 'Chat', icon: MessageSquare, badge: unreadChat as boolean | number },
+          ]
         ).map(({ key, label, icon: Icon, badge }) => (
           <button
             key={key}
-            onClick={() => setMobileTab(key)}
+            onClick={() => { setMobileTab(key as typeof mobileTab); if (key === 'chat') setUnreadChat(0); }}
             className={clsx(
               'flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-semibold transition-colors relative',
               mobileTab === key ? 'text-indigo-600' : 'text-slate-400 active:text-slate-600'
@@ -709,9 +760,13 @@ export default function Room() {
             )}
             <div className="relative">
               <Icon className="w-5 h-5" />
-              {badge && (
+              {badge && typeof badge === 'number' && badge > 0 ? (
+                <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 px-0.5 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              ) : badge ? (
                 <span className="absolute -top-1 -right-1.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
-              )}
+              ) : null}
             </div>
             {label}
           </button>
@@ -733,7 +788,7 @@ export default function Room() {
       {/* Floating feedback pill */}
       <button
         onClick={() => setShowFeedback(true)}
-        className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105 active:scale-95 transition-all duration-150"
+        className="fixed bottom-20 lg:bottom-6 right-4 lg:right-auto lg:left-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105 active:scale-95 transition-all duration-150"
       >
         <MessageSquarePlus className="w-4 h-4 flex-shrink-0" />
         <span className="hidden sm:block">Feedback</span>

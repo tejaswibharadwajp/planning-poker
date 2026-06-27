@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth, useUser } from '@clerk/clerk-react';
-import { Room, Reaction } from '../types';
+import { Room, Reaction, ChatMessage } from '../types';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
@@ -22,6 +22,8 @@ interface SocketContextValue {
   kicked: boolean;
   roomClosed: boolean;
   reactions: Reaction[];
+  chatMessages: ChatMessage[];
+  sendChatMessage: (message: string, toUserId?: string) => void;
   startQuickVote: () => void;
   joinRoom: (params: {
     roomName?: string;
@@ -60,6 +62,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [kicked, setKicked] = useState(false);
   const [roomClosed, setRoomClosed] = useState(false);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const { userId: clerkUserId } = useAuth();
   const { user } = useUser();
 
@@ -134,6 +137,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setTimeout(() => {
         setReactions((prev) => prev.filter((rx) => rx.id !== reaction.id));
       }, 3000);
+    });
+
+    socket.on('chat-message', (msg: ChatMessage) => {
+      setChatMessages((prev) => [...prev, msg]);
     });
 
     return () => {
@@ -257,6 +264,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   }, []);
 
+  const sendChatMessage = useCallback(
+    (message: string, toUserId?: string) =>
+      socketRef.current?.emit('send-chat', { message, toUserId }),
+    []
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   return (
@@ -270,6 +283,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         kicked,
         roomClosed,
         reactions,
+        chatMessages,
+        sendChatMessage,
         startQuickVote,
         joinRoom,
         addStory,
