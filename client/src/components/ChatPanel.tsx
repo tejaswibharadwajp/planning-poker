@@ -256,7 +256,7 @@ export default function ChatPanel({ messages, currentUserId, users, onSend, onRe
           <select
             value={toUserId}
             onChange={(e) => setToUserId(e.target.value)}
-            className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            className="w-full text-[16px] lg:text-xs border border-slate-200 rounded-lg px-2 py-2 lg:py-1.5 text-slate-600 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
           >
             <option value="">Everyone (public)</option>
             {connectedOthers.map((u) => (
@@ -278,14 +278,14 @@ export default function ChatPanel({ messages, currentUserId, users, onSend, onRe
             onChange={(e) => setInput(e.target.value)}
             placeholder={toUserId ? 'Private message…' : 'Message everyone…'}
             maxLength={500}
-            className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 placeholder-slate-400 bg-white"
+            className="flex-1 text-[16px] lg:text-xs border border-slate-200 rounded-lg px-2.5 py-2 lg:py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 placeholder-slate-400 bg-white"
           />
           <button
             type="submit"
             disabled={!input.trim()}
-            className="w-7 h-7 flex items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors flex-shrink-0"
+            className="w-9 h-9 lg:w-7 lg:h-7 flex items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors flex-shrink-0"
           >
-            <Send className="w-3.5 h-3.5" />
+            <Send className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
           </button>
         </form>
       </div>
