@@ -583,6 +583,9 @@ io.on('connection', (socket) => {
     if (!user) return;
 
     if (user.isAdmin) {
+      // Clear chat for everyone in the room when any facilitator leaves
+      io.to(room.code).emit('chat-cleared');
+
       const otherAdmins = room.users.filter((u) => u.id !== user.id && u.isAdmin && u.isConnected);
       if (otherAdmins.length === 0) {
         socket.to(room.code).emit('room-closed');
