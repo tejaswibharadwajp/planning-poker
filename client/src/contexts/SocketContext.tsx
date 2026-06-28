@@ -55,6 +55,7 @@ const SocketContext = createContext<SocketContextValue | null>(null);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
+  const roomCodeRef = useRef<string | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [roomPassword, setRoomPassword] = useState<string | null>(null);
@@ -101,8 +102,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on('room-joined', ({ room: r, userId: uid, password: pwd }: { room: Room; userId: string; password?: string }) => {
       setRoom(r);
       setUserId(uid);
+      roomCodeRef.current = r.code;
       if (pwd) setRoomPassword(pwd);
       setError(null);
+      // Restore persisted chat for this room
+      try {
+        const savedChat = sessionStorage.getItem(`chat_${r.code}`);
+        if (savedChat) setChatMessages(JSON.parse(savedChat));
+      } catch { /* ignore */ }
       const saved = sessionStorage.getItem('poker_session');
       try {
         const parsed = saved ? JSON.parse(saved) : {};
@@ -124,7 +131,17 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setKicked(true);
     });
 
+    const clearChat = () => {
+      try {
+        if (roomCodeRef.current) sessionStorage.removeItem(`chat_${roomCodeRef.current}`);
+      } catch { /* ignore */ }
+      setChatMessages([]);
+    };
+
+    socket.on('chat-cleared', clearChat);
+
     socket.on('room-closed', () => {
+      clearChat();
       sessionStorage.removeItem('poker_session');
       setRoom(null);
       setUserId(null);
@@ -140,13 +157,23 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       }, 3000);
     });
 
+    const saveChatToStorage = (msgs: ChatMessage[]) => {
+      try {
+        if (roomCodeRef.current) sessionStorage.setItem(`chat_${roomCodeRef.current}`, JSON.stringify(msgs));
+      } catch { /* ignore */ }
+    };
+
     socket.on('chat-message', (msg: ChatMessage) => {
-      setChatMessages((prev) => [...prev, { ...msg, reactions: msg.reactions ?? {} }]);
+      setChatMessages((prev) => {
+        const next = [...prev, { ...msg, reactions: msg.reactions ?? {} }];
+        saveChatToStorage(next);
+        return next;
+      });
     });
 
     socket.on('chat-reaction', ({ messageId, emoji, userId }: { messageId: string; emoji: string; userId: string }) => {
-      setChatMessages((prev) =>
-        prev.map((msg) => {
+      setChatMessages((prev) => {
+        const next = prev.map((msg) => {
           if (msg.id !== messageId) return msg;
           const existing = msg.reactions[emoji] ?? [];
           const alreadyReacted = existing.includes(userId);
@@ -159,8 +186,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
                 : [...existing, userId],
             },
           };
-        })
-      );
+        });
+        saveChatToStorage(next);
+        return next;
+      });
     });
 
     return () => {
@@ -198,10 +227,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   const leaveRoom = useCallback(() => {
     socketRef.current?.emit('leave-room');
+    if (roomCodeRef.current) sessionStorage.removeItem(`chat_${roomCodeRef.current}`);
     sessionStorage.removeItem('poker_session');
     setRoom(null);
     setUserId(null);
     setRoomPassword(null);
+    setChatMessages([]);
+    roomCodeRef.current = null;
     socketRef.current?.disconnect();
     setTimeout(() => socketRef.current?.connect(), 100);
   }, []);

@@ -69,4 +69,13 @@
     60%  { transform: translateY(-120px) scale(1.2); opacity: 1; }
     100% { transform: translateY(-220px) scale(0.8); opacity: 0; }
   }
+
+  @keyframes chat-glow {
+    0%, 100% { box-shadow: 0 0 8px 2px rgba(99,102,241,0.45), 0 0 24px 6px rgba(99,102,241,0.2); }
+    50%       { box-shadow: 0 0 16px 5px rgba(99,102,241,0.75), 0 0 40px 12px rgba(99,102,241,0.35); }
+  }
+
+  .animate-chat-glow {
+    animation: chat-glow 2s ease-in-out infinite;
+  }
 }

@@ -98,6 +98,8 @@ export default function Room() {
 
   const { user } = useUser();
   const [showFeedback, setShowFeedback] = useState(false);
+  const feedbackShownRef = useRef(false);
+  const revoteCountRef = useRef(0);
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showSharePopover, setShowSharePopover] = useState(false);
@@ -199,7 +201,7 @@ export default function Room() {
 
       // r/R: revote (admin, revealed phase)
       if ((e.key === 'r' || e.key === 'R') && me.isAdmin && activeStory?.status === 'revealed') {
-        resetVotes(activeStory.id);
+        handleRevote(activeStory.id);
       }
     };
 
@@ -212,6 +214,18 @@ export default function Room() {
     prevChatLen.current = chatMessages.length;
     if (newCount > 0 && !chatOpen) setUnreadChat((n) => n + newCount);
   }, [chatMessages.length, chatOpen]);
+
+  // Auto-show feedback after 2 stories done, once per session, within 3 min window
+  useEffect(() => {
+    if (!room || feedbackShownRef.current) return;
+    const doneCount = room.stories.filter((s) => s.status === 'done').length;
+    if (doneCount < 2) return;
+    const sessionAge = Date.now() - room.createdAt;
+    if (sessionAge > 3 * 60 * 1000) return;
+    feedbackShownRef.current = true;
+    const t = setTimeout(() => setShowFeedback(true), 4000);
+    return () => clearTimeout(t);
+  }, [room?.stories.filter((s) => s.status === 'done').length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close chat on outside click (no overlay)
   useEffect(() => {
@@ -354,6 +368,18 @@ export default function Room() {
   }
 
   if (!room) return null;
+
+  const triggerFeedbackIfEligible = () => {
+    if (feedbackShownRef.current) return;
+    feedbackShownRef.current = true;
+    setTimeout(() => setShowFeedback(true), 4000);
+  };
+
+  const handleRevote = (storyId: string) => {
+    resetVotes(storyId);
+    revoteCountRef.current += 1;
+    if (revoteCountRef.current >= 2) triggerFeedbackIfEligible();
+  };
 
   const currentUser = room.users.find((u) => u.id === userId) ?? null;
   const isAdmin = currentUser?.isAdmin ?? false;
@@ -688,7 +714,7 @@ export default function Room() {
                     <VoteResults
                       story={activeStory}
                       isAdmin={isAdmin}
-                      onRevote={() => resetVotes(activeStory.id)}
+                      onRevote={() => handleRevote(activeStory.id)}
                       onSetEstimate={(est) => handleSetEstimate(activeStory.id, est)}
                       cards={deckCards}
                     />
@@ -803,10 +829,10 @@ export default function Room() {
         onClick={() => { setChatOpen((v) => !v); setUnreadChat(0); }}
         className={clsx(
           'fixed bottom-[8.5rem] right-4 lg:bottom-6 lg:right-6 z-50',
-          'inline-flex items-center justify-center gap-2 w-28 py-2.5 rounded-full font-semibold text-sm shadow-lg transition-all duration-150 hover:scale-105 active:scale-95',
+          'inline-flex items-center justify-center gap-2 w-28 py-2.5 rounded-full font-semibold text-sm transition-all duration-150 hover:scale-105 active:scale-95 animate-chat-glow',
           chatOpen
-            ? 'bg-slate-800 text-white shadow-slate-800/30'
-            : 'bg-slate-900 text-white shadow-slate-900/30 hover:bg-slate-800'
+            ? 'bg-slate-800 text-white'
+            : 'bg-slate-900 text-white hover:bg-slate-800'
         )}
       >
         <MessageSquare className="w-4 h-4 flex-shrink-0" />
